@@ -403,6 +403,34 @@ table.data tbody tr:nth-child(odd) { background: color-mix(in srgb, var(--bg-sof
   .grid-3 { grid-template-columns: repeat(3, 1fr); }
 }
 
+/* ---------- 截图导入运动记录 ---------- */
+.import { position: relative; border: 1px dashed var(--line); border-radius: var(--radius); background: var(--bg-soft); padding: 12px; margin-bottom: 12px; }
+.import.drag { border-color: var(--brand); background: var(--brand-soft); }
+.import-head { display: flex; align-items: center; gap: 10px; }
+.import-head .icon { font-size: 20px; }
+.import-title { font-weight: 650; margin-bottom: 2px; }
+.import-progress { margin-top: 10px; }
+.import-progress .bar { height: 6px; border-radius: 999px; background: var(--bg-input); overflow: hidden; }
+.import-progress .bar i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .2s; }
+.import-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.import-row { background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px; }
+.import-row.picked { border-color: var(--brand); }
+.import-row .rhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.import-row .rgrid { display: flex; flex-wrap: wrap; gap: 8px; }
+.import-row .rgrid > label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--text-dim); }
+.import-row .rgrid select { min-width: 88px; }
+.import-row .rgrid input[type="number"] { width: 76px; }
+.import-row .rgrid input[type="date"] { width: 138px; }
+.import-row .rgrid .rnote { flex: 1 1 100%; }
+.import-row .rgrid .rnote input { width: 100%; }
+.import-row .chk { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-dim); }
+.import-row .chk input { width: 18px; height: 18px; }
+.import-actions { display: flex; gap: 8px; margin-top: 10px; }
+.import-raw { margin-top: 10px; }
+.import-raw summary { cursor: pointer; font-size: 12.5px; color: var(--text-dim); }
+.import-raw pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; line-height: 1.5; background: var(--bg-input); border-radius: 8px; padding: 8px; margin-top: 6px; max-height: 200px; overflow: auto; }
+.import-hint { font-size: 12px; color: var(--text-dim); margin-top: 8px; }
+
 @media print {
   .nav, .topbar, .btn { display: none; }
 }
