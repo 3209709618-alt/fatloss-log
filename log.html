@@ -53,6 +53,29 @@
       <button class="btn btn-sm btn-ghost" id="copyYesterday">复制昨天</button>
     </div>
 
+    <!-- 从运动 App 截图导入 -->
+    <div class="import" id="importer">
+      <div class="import-head">
+        <span class="icon">📷</span>
+        <div class="grow">
+          <div class="import-title">从截图导入</div>
+          <div class="small muted">用手机运动 App 的截图自动识别日期、类型、时长、消耗</div>
+        </div>
+      </div>
+      <input type="file" id="shotInput" accept="image/*" class="hidden">
+      <button class="btn btn-primary mt12" id="shotPick" type="button">选择截图</button>
+      <div class="import-hint" id="shotHint">也可以把图片拖进这里。识别全程在本机浏览器完成，图片不会上传到任何服务器。</div>
+      <div class="import-progress hidden" id="shotProgress">
+        <div class="small muted" id="shotStatus">正在准备…</div>
+        <div class="bar mt8"><i id="shotBar"></i></div>
+      </div>
+      <div class="import-rows" id="shotRows"></div>
+      <details class="import-raw hidden" id="shotRawWrap">
+        <summary>看看识别出的原文</summary>
+        <pre id="shotRaw"></pre>
+      </details>
+    </div>
+
     <form id="exForm" autocomplete="off">
       <input type="hidden" id="exId">
       <div class="field-row">
@@ -173,6 +196,7 @@
 
 <script src="assets/storage.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/ocr-import.js"></script>
 <script>
 (function () {
   var S = window.FatLossStorage, A = window.FatLossApp;
@@ -316,6 +340,153 @@
     });
     A.flash('已复制昨天 ' + items.length + ' 条运动');
   });
+
+  /* ---------- 从截图导入 ---------- */
+  var shot = { items: [] };
+  var shotInput = document.getElementById('shotInput');
+  var shotRows = document.getElementById('shotRows');
+  var shotProgress = document.getElementById('shotProgress');
+  var shotStatus = document.getElementById('shotStatus');
+  var shotBar = document.getElementById('shotBar');
+  var shotHint = document.getElementById('shotHint');
+  var shotRawWrap = document.getElementById('shotRawWrap');
+  var shotRaw = document.getElementById('shotRaw');
+  var importer = document.getElementById('importer');
+
+  document.getElementById('shotPick').addEventListener('click', function () { shotInput.click(); });
+  shotInput.addEventListener('change', function () {
+    if (shotInput.files && shotInput.files[0]) handleShot(shotInput.files[0]);
+  });
+  importer.addEventListener('dragover', function (e) { e.preventDefault(); importer.classList.add('drag'); });
+  importer.addEventListener('dragleave', function () { importer.classList.remove('drag'); });
+  importer.addEventListener('drop', function (e) {
+    e.preventDefault();
+    importer.classList.remove('drag');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleShot(f);
+  });
+
+  function shotBusy(on, text) {
+    shotProgress.classList.toggle('hidden', !on);
+    if (text) shotStatus.textContent = text;
+  }
+
+  function shotTypes() {
+    return Array.prototype.map.call(document.getElementById('exType').options, function (o) { return o.value; });
+  }
+
+  function renderShot() {
+    var items = shot.items;
+    if (!items.length) { shotRows.innerHTML = ''; return; }
+    var types = shotTypes();
+    shotRows.innerHTML = items.map(function (it, i) {
+      var conf = it.confidence || '低';
+      return '<div class="import-row" data-i="' + i + '">' +
+        '<div class="rhead">' +
+          '<label class="chk"><input type="checkbox" data-f="picked"' + (it.picked ? ' checked' : '') + '>第 ' + (i + 1) + ' 条</label>' +
+          '<span class="tag grow">可信度 ' + conf + '</span>' +
+        '</div>' +
+        '<div class="rgrid">' +
+          '<label>日期<input type="date" data-f="date" value="' + it.date + '"></label>' +
+          '<label>类型<select data-f="type">' + types.map(function (t) {
+            return '<option' + (t === it.type ? ' selected' : '') + '>' + A.escapeHtml(t) + '</option>';
+          }).join('') + '</select></label>' +
+          '<label>时长(分)<input type="number" min="1" max="1440" inputmode="numeric" data-f="durationMin" value="' + (it.durationMin || '') + '"></label>' +
+          '<label>消耗(kcal)<input type="number" min="0" inputmode="numeric" data-f="kcal" value="' + (it.kcal == null ? '' : it.kcal) + '"></label>' +
+          '<label class="rnote">备注<input type="text" maxlength="40" data-f="note" value="' + A.escapeHtml(it.note || '') + '"></label>' +
+        '</div>' +
+      '</div>';
+    }).join('') +
+    '<div class="import-actions">' +
+      '<button class="btn btn-primary grow" type="button" id="shotAdd">加入勾选的 ' + items.filter(function (x) { return x.picked; }).length + ' 条</button>' +
+      '<button class="btn btn-ghost" type="button" id="shotClear">清空</button>' +
+    '</div>';
+  }
+
+  function collectShot() {
+    Array.prototype.forEach.call(shotRows.querySelectorAll('.import-row'), function (row) {
+      var it = shot.items[Number(row.getAttribute('data-i'))];
+      if (!it) return;
+      Array.prototype.forEach.call(row.querySelectorAll('[data-f]'), function (el) {
+        var field = el.getAttribute('data-f');
+        if (field === 'picked') it.picked = el.checked;
+        else if (field === 'durationMin' || field === 'kcal') it[field] = el.value === '' ? null : Number(el.value);
+        else it[field] = el.value;
+      });
+    });
+  }
+
+  shotRows.addEventListener('input', function () {
+    collectShot();
+    var btn = document.getElementById('shotAdd');
+    if (btn) btn.textContent = '加入勾选的 ' + shot.items.filter(function (x) { return x.picked; }).length + ' 条';
+  });
+  shotRows.addEventListener('change', function () {
+    collectShot();
+    var btn = document.getElementById('shotAdd');
+    if (btn) btn.textContent = '加入勾选的 ' + shot.items.filter(function (x) { return x.picked; }).length + ' 条';
+  });
+  shotRows.addEventListener('click', function (e) {
+    if (e.target.id === 'shotClear') { shot.items = []; renderShot(); shotRawWrap.classList.add('hidden'); shotHint.textContent = '已清空。'; return; }
+    if (e.target.id !== 'shotAdd') return;
+    collectShot();
+    var picked = shot.items.filter(function (x) { return x.picked; });
+    var added = 0, skipped = 0;
+    picked.forEach(function (it) {
+      var mins = Number(it.durationMin);
+      if (!isFinite(mins) || mins <= 0) { skipped++; return; }
+      S.addExercise({
+        date: /^\d{4}-\d{2}-\d{2}$/.test(it.date) ? it.date : state.date,
+        type: it.type,
+        intensity: it.intensity || '',
+        durationMin: mins,
+        calories: it.kcal == null || it.kcal === '' ? null : Number(it.kcal),
+        note: it.note || ''
+      });
+      added++;
+    });
+    if (!added) { A.toast('没有可加入的记录：时长不能为空', 'error'); return; }
+    A.flash('已加入 ' + added + ' 条运动' + (skipped ? '，跳过 ' + skipped + ' 条' : ''));
+    shot.items = [];
+    renderShot();
+    shotRawWrap.classList.add('hidden');
+    shotHint.textContent = '已加入。可以再选一张截图，或直接在下面手动补记。';
+    shotInput.value = '';
+  });
+
+  function handleShot(file) {
+    if (!/^image\//.test(file.type || '')) { A.toast('请选择图片文件', 'error'); return; }
+    if (!window.OcrImport) { A.toast('识别模块没加载出来，刷新页面再试', 'error'); return; }
+    shot.items = [];
+    renderShot();
+    shotRawWrap.classList.add('hidden');
+    shotBusy(true, '正在准备识别引擎（第一次约 7 MB，之后浏览器会缓存）…');
+    shotBar.style.width = '3%';
+    window.OcrImport.ensureEngine(function (m) {
+      shotStatus.textContent = window.OcrImport.ensureEngineText(m.status, m.progress);
+      if (typeof m.progress === 'number') shotBar.style.width = Math.max(3, Math.round(m.progress * 100)) + '%';
+    }).then(function () {
+      shotBusy(true, '正在识别文字…');
+      return window.OcrImport.recognize(file);
+    }).then(function (text) {
+      shotBusy(false);
+      var res = window.OcrImport.parseWorkoutText(text, { defaultDate: state.date });
+      shotRaw.textContent = text.slice(0, 3000);
+      shotRawWrap.classList.remove('hidden');
+      if (!text || !text.trim()) { shotHint.textContent = '没识别出文字。换一张更清晰的截图试试，或者直接手动填写。'; return; }
+      if (!res.items.length) {
+        shotHint.textContent = '这张图里没找到「时长」或「消耗」这类信息，所以没生成候选。可以在下面手动填写，或换一张运动详情页的截图。';
+        return;
+      }
+      res.items.forEach(function (it) { it.picked = true; });
+      shot.items = res.items;
+      renderShot();
+      shotHint.textContent = '识别出 ' + res.items.length + ' 条候选，核对后点「加入」；不想要的先把勾去掉。';
+    }).catch(function (err) {
+      shotBusy(false);
+      shotHint.textContent = '识别失败：' + ((err && err.message) || err) + '。可以先手动填写，或刷新后重试。';
+    });
+  }
 
   /* ---------- 饮食表单 ---------- */
   function resetMealForm() {
