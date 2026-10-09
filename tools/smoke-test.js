@@ -167,4 +167,100 @@ test('换档系数换算与视频示例一致（85kg × 2–3 小时档）', () 
   assert.strictEqual(Math.round(raw[1] / 5) * 5, 120);
 });
 
+test('别的标签页改过数据后，本页读到的是最新值（缓存按原始串失效）', () => {
+  S.clearAll();
+  S.addExercise({ date: '2026-10-09', type: '力量', durationMin: 10 });
+  assert.strictEqual(S.loadRecords().exercises.length, 1);
+  const external = {
+    version: 1,
+    exercises: [{ id: 'ext1', date: '2026-10-08', type: '有氧', durationMin: 20, createdAt: '2026-10-08T00:00:00.000Z' }],
+    meals: [], weights: [], customFoods: []
+  };
+  localStorage.setItem(S.RECORDS_KEY, JSON.stringify(external));
+  const rec = S.loadRecords();
+  assert.strictEqual(rec.exercises.length, 1, '不应沿用旧缓存');
+  assert.strictEqual(rec.exercises[0].id, 'ext1');
+  localStorage.removeItem(S.RECORDS_KEY);
+  assert.strictEqual(S.loadRecords().exercises.length, 0, '外部清空后应立即反映');
+});
+
+test('写入被拒绝时不假装成功：标记未保存、磁盘不被写空', () => {
+  S.clearAll();
+  S.addExercise({ date: '2026-10-09', type: '力量', durationMin: 10 });
+  const real = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = () => { const e = new Error('blocked'); e.name = 'QuotaExceededError'; throw e; };
+  try {
+    S.addExercise({ date: '2026-10-09', type: '有氧', durationMin: 20 });
+  } finally {
+    localStorage.setItem = real;
+  }
+  const d = S.diagnostics();
+  assert.strictEqual(d.lastSaveOk, false, '应记录保存失败');
+  assert.strictEqual(d.pending, true, '应标记有数据没落盘');
+  assert.strictEqual(d.lastError.type, 'write');
+  assert.strictEqual(S.loadRecords().exercises.length, 2, '内存里仍能看到刚才那条');
+  assert.strictEqual(JSON.parse(localStorage.getItem(S.RECORDS_KEY)).exercises.length, 1, '磁盘上仍是旧数据');
+});
+
+test('被截断的 JSON 会被抢救回来，并留下损坏副本', () => {
+  S.clearAll();
+  S.addExercise({ date: '2026-10-09', type: '力量', durationMin: 30 });
+  S.addExercise({ date: '2026-10-09', type: '有氧', durationMin: 20 });
+  const full = localStorage.getItem(S.RECORDS_KEY);
+  localStorage.setItem(S.RECORDS_KEY, full.slice(0, full.length - 20)); // 模拟写到一半被打断（尾巴丢一小段）
+
+  const rec = S.loadRecords();
+  assert.strictEqual(rec.exercises.length, 2, '应救回两条运动记录');
+  assert.ok(S.quarantineText().length > 0, '损坏原文应留副本');
+  assert.strictEqual(S.diagnostics().lastError.type, 'repair');
+  assert.strictEqual(JSON.parse(localStorage.getItem(S.RECORDS_KEY)).exercises.length, 2, '修好的数据应写回');
+});
+
+test('修不了的损坏数据留副本而不是当空数据静默覆盖', () => {
+  S.clearAll();
+  localStorage.setItem(S.RECORDS_KEY, 'not json at all');
+  assert.strictEqual(S.loadRecords().exercises.length, 0);
+  assert.ok(S.quarantineText().includes('not json at all'), '原文应留副本');
+  assert.strictEqual(S.diagnostics().lastError.type, 'corrupt');
+});
+
+test('每次改动前自动留快照，可以退回上一版', () => {
+  S.clearAll();
+  S.addExercise({ date: '2026-10-09', type: '力量', durationMin: 30 });
+  S.addExercise({ date: '2026-10-09', type: '有氧', durationMin: 20 });
+  S.addExercise({ date: '2026-10-09', type: '步行', durationMin: 40 });
+  const snaps = S.listSnapshots();
+  assert.ok(snaps.length >= 2, '应有多次快照，实际 ' + snaps.length);
+  const target = snaps.filter(s => s.exercises === 1)[0];
+  assert.ok(target, '应能找到只有 1 条运动的快照');
+  const res = S.restoreSnapshot(target.id);
+  assert.strictEqual(res.ok, true);
+  assert.strictEqual(S.loadRecords().exercises.length, 1);
+});
+
+test('清空数据前也留快照，清空后能退回来', () => {
+  S.clearAll();
+  S.addExercise({ date: '2026-10-09', type: '力量', durationMin: 25 });
+  S.upsertWeight('2026-10-09', 72);
+  S.clearAll();
+  assert.strictEqual(S.loadRecords().exercises.length, 0);
+  const snap = S.listSnapshots().filter(s => s.exercises === 1)[0];
+  assert.ok(snap, '清空前应有快照');
+  assert.strictEqual(S.restoreSnapshot(snap.id).ok, true);
+  assert.strictEqual(S.loadRecords().exercises.length, 1);
+  assert.strictEqual(S.loadRecords().weights[0].weight, 72);
+});
+
+test('自检信息结构完整（origin/容量/条数/日志）', () => {
+  S.clearAll();
+  S.addExercise({ date: '2026-10-09', type: '力量', durationMin: 15 });
+  const d = S.diagnostics();
+  assert.strictEqual(typeof d.available, 'boolean');
+  assert.strictEqual(d.counts.exercises, 1);
+  assert.ok(d.bytes > 0, '占用量应为正数');
+  assert.ok(Array.isArray(d.snapshots));
+  assert.ok(Array.isArray(d.log));
+  assert.strictEqual(typeof d.pending, 'boolean');
+});
+
 console.log('\n通过 ' + passed + ' 项' + (process.exitCode ? '（有失败）' : '，全部通过'));
