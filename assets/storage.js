@@ -21,6 +21,14 @@
   var EX_TYPES = ['力量', '有氧', '球类', '步行', '其他'];
   var INTENSITIES = ['低', '中', '高'];
 
+  /* 防丢数据用的辅助键：快照、损坏副本、日志、上次导出时间 */
+  var SNAPSHOT_KEY = 'fatloss.snapshots.v1';
+  var CORRUPT_KEY = 'fatloss.corrupt.v1';
+  var LOG_KEY = 'fatloss.log.v1';
+  var EXPORT_KEY = 'fatloss.lastexport.v1';
+  var SNAPSHOT_MAX = 6;
+  var LOG_MAX = 20;
+
   /* ---------------- 基础工具 ---------------- */
 
   function uid() {
@@ -36,40 +44,90 @@
     return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
   }
 
+  /**
+   * 本机存储是否真的能写：写进去、读回来、比对，再删掉。
+   * 无痕模式 / 被系统限制存储时，setItem 可能抛异常或静默失效，这里都要能识别出来。
+   */
   function storageAvailable() {
     try {
       var k = '__fatloss_probe__';
-      global.localStorage.setItem(k, '1');
+      var v = '1';
+      global.localStorage.setItem(k, v);
+      var back = global.localStorage.getItem(k);
       global.localStorage.removeItem(k);
-      return true;
+      return back === v;
     } catch (e) {
       return false;
     }
   }
 
-  function readJSON(key, fallback) {
+  /* ---------------- 运行状态（给界面用的诊断信息） ---------------- */
+
+  var state = {
+    lastError: null,      // { type: 'write' | 'corrupt' | 'repair', message, at }
+    lastSaveAt: null,
+    lastSaveOk: null,
+    writeFails: 0,
+    persisting: null      // null | 'asking' | 'granted' | 'denied' | 'error'
+  };
+
+  function nowIso() { return new Date().toISOString(); }
+
+  function metaList(key) {
     try {
-      var raw = global.localStorage.getItem(key);
-      if (!raw) return fallback;
-      var parsed = JSON.parse(raw);
-      return parsed === null || parsed === undefined ? fallback : parsed;
-    } catch (e) {
-      console.warn('[storage] 读取失败，使用默认值:', key, e);
-      return fallback;
-    }
+      var v = JSON.parse(global.localStorage.getItem(key) || '[]');
+      return Array.isArray(v) ? v : [];
+    } catch (e) { return []; }
   }
 
+  function metaSave(key, list) {
+    try { global.localStorage.setItem(key, JSON.stringify(list)); } catch (e) { /* 辅助键写不进不影响主流程 */ }
+  }
+
+  function logEvent(kind, message) {
+    var list = metaList(LOG_KEY);
+    list.unshift({ at: nowIso(), kind: kind, message: message });
+    metaSave(LOG_KEY, list.slice(0, LOG_MAX));
+  }
+
+  function noteError(type, message) {
+    state.lastError = { type: type, message: message, at: nowIso() };
+    if (type === 'write') state.writeFails++;
+    logEvent(type, message);
+    console.warn('[storage]', type, message);
+  }
+
+  function clearError() { state.lastError = null; }
+
+  function safeStringify(value) {
+    try { return JSON.stringify(value); } catch (e) { return null; }
+  }
+
+  /**
+   * 写入 + 回读校验：写成功后必须能从 localStorage 读回一模一样的字符串。
+   * 只写不校验的话，无痕模式/空间满时页面会「假装保存成功」，刷新后数据全没了。
+   */
   function writeJSON(key, value) {
+    var str = safeStringify(value);
+    if (str === null) { noteError('write', '数据无法序列化'); return false; }
     try {
-      global.localStorage.setItem(key, JSON.stringify(value));
-      return true;
+      global.localStorage.setItem(key, str);
     } catch (e) {
-      console.error('[storage] 写入失败:', key, e);
-      if (global.FatLossApp && global.FatLossApp.toast) {
-        global.FatLossApp.toast('保存失败：浏览器存储空间可能已满', 'error');
-      }
+      noteError('write', '浏览器拒绝保存（' + ((e && e.name) || '未知错误') + '）');
       return false;
     }
+    var back = null;
+    try { back = global.localStorage.getItem(key); } catch (e) { back = null; }
+    if (back !== str) { noteError('write', '写入后校验不一致，数据可能没真正落盘'); return false; }
+    return true;
+  }
+
+  function bytesSafe() {
+    try {
+      var a = global.localStorage.getItem(RECORDS_KEY) || '';
+      var b = global.localStorage.getItem(SETTINGS_KEY) || '';
+      return (a.length + b.length) * 2;
+    } catch (e) { return 0; }
   }
 
   function emit() {
@@ -183,8 +241,10 @@
   /* ---------------- 读写 ---------------- */
 
   /* 缓存按「localStorage 里的原始串」失效：别的标签页写过、或用户清过浏览器数据后，
-     这里读到的才是最新值，避免用旧缓存把别人的记录覆盖掉。 */
-  var cache = { records: null, recordsRaw: null, settings: null, settingsRaw: null };
+     这里读到的才是最新值，避免用旧缓存把别人的记录覆盖掉。
+     pending=true 表示内存里有一条「没能写进磁盘」的新数据，此时界面继续显示它，
+     同时顶部横幅提醒用户马上导出备份。 */
+  var cache = { records: null, recordsRaw: null, settings: null, settingsRaw: null, pending: false, brokenRaw: null };
 
   function readRaw(key) {
     try { return global.localStorage.getItem(key); } catch (e) { return null; }
@@ -193,23 +253,117 @@
   function parseRaw(raw, label) {
     if (!raw) return null;
     try { return JSON.parse(raw); } catch (e) {
-      console.warn('[storage] 解析失败，按空数据处理:', label, e);
+      console.warn('[storage] 解析失败:', label, e);
       return null;
     }
   }
 
+  /** 损坏的原文留一份副本，绝不静默丢弃 */
+  function quarantine(from, raw) {
+    var list = metaList(CORRUPT_KEY);
+    if (list.length && list[0].raw === raw) return;
+    list.unshift({ at: nowIso(), from: from, raw: raw });
+    metaSave(CORRUPT_KEY, list.slice(0, 3));
+  }
+
+  /**
+   * 被截断的 JSON（写到一半被系统打断）通常只是结尾少了括号：
+   * 从后往前找最后一个完整的 }，补上收尾括号试解析，能救回多少算多少。
+   */
+  function salvageRecords(raw) {
+    if (typeof raw !== 'string' || raw.length < 2) return null;
+    var tries = 0;
+    for (var i = raw.length - 1; i > 1 && tries < 500; i--) {
+      if (raw.charAt(i) !== '}') continue;
+      tries++;
+      var head = raw.slice(0, i + 1);
+      var candidates = [head + ']}', head + ']}}', head + '}}', head + ']'];
+      for (var c = 0; c < candidates.length; c++) {
+        var obj = null;
+        try { obj = JSON.parse(candidates[c]); } catch (e) { obj = null; }
+        if (!obj) continue;
+        var rec = migrateRecords(obj);
+        if (countRecords(rec) > 0) return rec;
+      }
+    }
+    return null;
+  }
+
   function loadRecords() {
+    if (cache.pending && cache.records) return cache.records;
     var raw = readRaw(RECORDS_KEY);
     if (cache.records && cache.recordsRaw === raw) return cache.records;
+
+    // 内容存在却解析不了 = 数据损坏，先留副本再尝试抢救，绝不直接当「没有记录」
+    if (raw && cache.brokenRaw !== raw && parseRaw(raw, RECORDS_KEY) === null) {
+      cache.brokenRaw = raw;
+      quarantine(RECORDS_KEY, raw);
+      var fixed = salvageRecords(raw);
+      if (fixed) {
+        cache.records = fixed;
+        cache.recordsRaw = writeJSON(RECORDS_KEY, fixed) ? safeStringify(fixed) : raw;
+        noteError('repair', '数据损坏，已自动修复并恢复 ' + countRecords(fixed) + ' 条记录（原始内容已留副本）');
+        return cache.records;
+      }
+      noteError('corrupt', '数据损坏且无法自动修复；原始内容已留副本，请到「设置 → 数据安全」导出');
+    }
+
     cache.records = migrateRecords(parseRaw(raw, RECORDS_KEY));
     cache.recordsRaw = raw;
     return cache.records;
   }
 
-  function saveRecords(records) {
+  /** 每次真正写入前，把「上一版」存成快照，误删/误导入都能退回去 */
+  function takeSnapshot(rawRecords, reason) {
+    if (!rawRecords) return;
+    var list = metaList(SNAPSHOT_KEY);
+    if (list.length && list[0].raw === rawRecords) return;
+    // 同一毫秒内可能连着写多次，所以快照要独立 id，不能只靠时间戳
+    list.unshift({ id: uid(), at: nowIso(), reason: reason || 'save', raw: rawRecords });
+    metaSave(SNAPSHOT_KEY, list.slice(0, SNAPSHOT_MAX));
+  }
+
+  function listSnapshots() {
+    return metaList(SNAPSHOT_KEY).map(function (s) {
+      var m = migrateRecords(parseRaw(s.raw, 'snapshot'));
+      return {
+        id: s.id || s.at, at: s.at, reason: s.reason || 'save',
+        exercises: m.exercises.length, meals: m.meals.length, weights: m.weights.length,
+        total: countRecords(m)
+      };
+    });
+  }
+
+  function restoreSnapshot(id) {
+    var list = metaList(SNAPSHOT_KEY);
+    for (var i = 0; i < list.length; i++) {
+      if ((list[i].id || list[i].at) !== id) continue;
+      var target = migrateRecords(parseRaw(list[i].raw, 'snapshot'));
+      if (countRecords(target) === 0) return { ok: false, error: '这个快照里没有记录' };
+      takeSnapshot(cache.recordsRaw || readRaw(RECORDS_KEY), 'restore');
+      saveRecords(target, 'restore');
+      return { ok: true, total: countRecords(target) };
+    }
+    return { ok: false, error: '找不到这个快照' };
+  }
+
+  function saveRecords(records, reason) {
+    var prev = cache.pending ? null : cache.recordsRaw;
+    var str = safeStringify(records);
+    if (prev && str && prev !== str) takeSnapshot(prev, reason || 'save');
     cache.records = records;
     var ok = writeJSON(RECORDS_KEY, records);
-    cache.recordsRaw = ok === false ? null : JSON.stringify(records);
+    if (ok) {
+      cache.recordsRaw = str;
+      cache.pending = false;
+      clearError();
+    } else {
+      cache.recordsRaw = null;
+      cache.pending = true;   // 内存里留着，界面继续显示，但顶部会挂红条
+    }
+    state.lastSaveAt = nowIso();
+    state.lastSaveOk = ok;
+    requestPersistOnce();
     emit();
     return records;
   }
@@ -217,6 +371,7 @@
   function loadSettings() {
     var raw = readRaw(SETTINGS_KEY);
     if (cache.settings && cache.settingsRaw === raw) return cache.settings;
+    if (raw && cache.settingsRaw !== raw && parseRaw(raw, SETTINGS_KEY) === null) quarantine(SETTINGS_KEY, raw);
     cache.settings = migrateSettings(parseRaw(raw, SETTINGS_KEY));
     cache.settingsRaw = raw;
     return cache.settings;
@@ -225,7 +380,8 @@
   function saveSettings(s) {
     cache.settings = migrateSettings(s);
     var ok = writeJSON(SETTINGS_KEY, cache.settings);
-    cache.settingsRaw = ok === false ? null : JSON.stringify(cache.settings);
+    cache.settingsRaw = ok === false ? null : safeStringify(cache.settings);
+    if (ok) clearError();
     emit();
     return cache.settings;
   }
@@ -235,6 +391,67 @@
     cache.recordsRaw = null;
     cache.settings = null;
     cache.settingsRaw = null;
+    cache.pending = false;
+    cache.brokenRaw = null;
+  }
+
+  /** 向浏览器申请「持久化存储」，降低被系统自动清理的概率 */
+  function requestPersistOnce() {
+    if (state.persisting || !global.navigator || !global.navigator.storage || !global.navigator.storage.persist) return;
+    state.persisting = 'asking';
+    try {
+      global.navigator.storage.persist().then(function (granted) {
+        state.persisting = granted ? 'granted' : 'denied';
+        logEvent('persist', granted ? '已获得持久化存储' : '浏览器未授予持久化存储');
+      }).catch(function () { state.persisting = 'error'; });
+    } catch (e) { state.persisting = 'error'; }
+  }
+
+  function requestPersist() {
+    state.persisting = null;
+    requestPersistOnce();
+    return state.persisting;
+  }
+
+  /** 给界面用的整体体检结果 */
+  function diagnostics() {
+    var rec = loadRecords();
+    var lastExport = null;
+    try { lastExport = global.localStorage.getItem(EXPORT_KEY); } catch (e) { lastExport = null; }
+    return {
+      origin: (global.location && global.location.origin) || '',
+      available: storageAvailable(),
+      pending: !!cache.pending,
+      lastSaveAt: state.lastSaveAt,
+      lastSaveOk: state.lastSaveOk,
+      lastError: state.lastError,
+      writeFails: state.writeFails,
+      persisting: state.persisting,
+      lastExportAt: lastExport,
+      counts: {
+        exercises: rec.exercises.length,
+        meals: rec.meals.length,
+        weights: rec.weights.length,
+        customFoods: rec.customFoods.length
+      },
+      bytes: bytesSafe(),
+      snapshots: listSnapshots(),
+      quarantine: metaList(CORRUPT_KEY).length,
+      log: metaList(LOG_KEY).slice(0, 8),
+      ua: (global.navigator && global.navigator.userAgent) || ''
+    };
+  }
+
+  function quarantineText() {
+    var list = metaList(CORRUPT_KEY);
+    return list.length ? list[0].raw : '';
+  }
+
+  function markExported() {
+    var at = nowIso();
+    try { global.localStorage.setItem(EXPORT_KEY, at); } catch (e) { /* 忽略 */ }
+    logEvent('export', '导出了 JSON 备份');
+    return at;
   }
 
   /* ---------------- 增删改 ---------------- */
@@ -434,9 +651,7 @@
   }
 
   function storageBytes() {
-    var a = global.localStorage.getItem(RECORDS_KEY) || '';
-    var b = global.localStorage.getItem(SETTINGS_KEY) || '';
-    return (a.length + b.length) * 2; // UTF-16 近似字节数
+    return bytesSafe(); // UTF-16 近似字节数
   }
 
   /* ---------------- 导入导出 ---------------- */
@@ -539,13 +754,14 @@
   }
 
   function invalidateAfterImport() {
-    cache.records = null;
-    cache.settings = null;
+    invalidate();
     loadRecords();
     loadSettings();
   }
 
   function clearAll() {
+    // 先留一份快照，清空后还能从「设置 → 数据安全」退回来
+    takeSnapshot(cache.recordsRaw || readRaw(RECORDS_KEY), 'clear');
     try {
       global.localStorage.removeItem(RECORDS_KEY);
       global.localStorage.removeItem(SETTINGS_KEY);
@@ -606,6 +822,13 @@
     importJSON: importJSON,
     clearAll: clearAll,
     today: today,
-    addDays: addDays
+    addDays: addDays,
+    /* 数据安全 / 自检 */
+    diagnostics: diagnostics,
+    requestPersist: requestPersist,
+    listSnapshots: listSnapshots,
+    restoreSnapshot: restoreSnapshot,
+    quarantineText: quarantineText,
+    markExported: markExported
   };
 })(typeof window !== 'undefined' ? window : globalThis);
