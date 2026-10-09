@@ -97,6 +97,32 @@
     <p class="small muted mt8">导入前建议先导出一份当前数据作为保险。</p>
   </section>
 
+  <section class="card" id="safe">
+    <div class="card-head">
+      <span class="icon">🛡️</span>
+      <h2 class="grow">数据安全</h2>
+      <button class="btn" id="safeCheck" type="button">重新检测</button>
+    </div>
+    <div id="safeStatus"></div>
+    <div class="grid grid-4 mt12" id="safeStats"></div>
+
+    <div class="row mt12">
+      <button class="btn btn-primary" id="safeBackup" type="button">立即备份（下载 JSON）</button>
+    </div>
+    <p class="small muted mt8" id="safeBackupHint"></p>
+
+    <div class="mt12">
+      <div class="li-title">历史快照（误删、误导入可以退回）</div>
+      <div id="snapList" class="mt8"></div>
+    </div>
+
+    <div id="corruptBox" class="mt12" hidden>
+      <div class="li-title">损坏数据副本</div>
+      <p class="small muted">检测到本机记录曾损坏，原始内容已保留。可导出后交给开发者尝试恢复。</p>
+      <button class="btn" id="exportCorrupt" type="button">导出损坏副本</button>
+    </div>
+  </section>
+
   <section class="card">
     <div class="card-head">
       <span class="icon">🧹</span>
@@ -161,6 +187,87 @@
     document.getElementById('storeChip').textContent = '本机存储 ' + A.fmtNum(bytes / 1024, 1) + ' KB';
   }
 
+  /* ---------------- 数据安全 ---------------- */
+
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    function p(n) { return n < 10 ? '0' + n : '' + n; }
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function daysAgo(iso) {
+    var t = new Date(iso).getTime();
+    if (isNaN(t)) return null;
+    return Math.max(0, Math.round((Date.now() - t) / 86400000));
+  }
+
+  function renderSafe() {
+    var d = S.diagnostics();
+    var issues = A.storageIssues();
+    document.getElementById('safeStatus').innerHTML = issues.length
+      ? '<div class="banner banner-' + (issues.some(function (i) { return i.level === 'danger'; }) ? 'danger' : 'warn') + '">' +
+        issues.map(function (i) { return '<div class="banner-line">' + A.escapeHtml(i.text) + '</div>'; }).join('') + '</div>'
+      : '<div class="small muted">本机存储状态正常：每次保存都会写后回读校验，并自动留一份改动前的快照。</div>';
+
+    var persistText = { granted: '已授予', denied: '未授予', asking: '申请中', error: '未知' }[d.persisting] || '未申请';
+    document.getElementById('safeStats').innerHTML =
+      '<div class="stat"><div class="k">能否写入</div><div class="v">' + (d.available ? '可以' : '不行') + '</div></div>' +
+      '<div class="stat"><div class="k">上次保存</div><div class="v v-sm">' + (d.lastSaveOk === false ? '失败' : (d.lastSaveAt ? fmtTime(d.lastSaveAt) : '—')) + '</div></div>' +
+      '<div class="stat"><div class="k">持久化存储</div><div class="v v-sm">' + persistText + '</div></div>' +
+      '<div class="stat"><div class="k">快照</div><div class="v">' + d.snapshots.length + '<small>份</small></div></div>';
+
+    var ago = d.lastExportAt ? daysAgo(d.lastExportAt) : null;
+    document.getElementById('safeBackupHint').textContent = d.lastExportAt
+      ? ('上次备份：' + fmtTime(d.lastExportAt) + '（' + ago + ' 天前）。建议每周导出一次，换手机、换浏览器时也能恢复。')
+      : '还没有导出过备份。建议每周导出一次，换手机、换浏览器时也能用这份文件恢复。';
+
+    document.getElementById('snapList').innerHTML = d.snapshots.length
+      ? '<ul class="list">' + d.snapshots.map(function (s) {
+          return '<li><div class="li-main"><div class="li-title">' + fmtTime(s.at) + ' · ' +
+            (s.reason === 'clear' ? '清空前' : s.reason === 'restore' ? '恢复前' : '改动前') + '</div>' +
+            '<div class="li-sub">运动 ' + s.exercises + ' · 饮食 ' + s.meals + ' · 体重 ' + s.weights + ' 条</div></div>' +
+            '<button class="btn" data-snap="' + s.id + '" type="button">恢复</button></li>';
+        }).join('') + '</ul>'
+      : '<div class="small muted">还没有快照（第一次保存后自动生成，最多保留 6 份）。</div>';
+
+    document.getElementById('corruptBox').hidden = !d.quarantine;
+  }
+
+  document.getElementById('safeCheck').addEventListener('click', function () {
+    S.requestPersist();
+    setTimeout(function () { renderSafe(); A.flash(S.available() ? '本机存储可以写入' : '本机存储不可写入，请导出备份'); }, 400);
+  });
+
+  document.getElementById('safeBackup').addEventListener('click', function () {
+    A.download('fatloss-backup-' + A.stamp() + '.json', S.exportJSON(), 'application/json');
+    S.markExported();
+    renderSafe();
+    A.flash('已导出 JSON 备份');
+  });
+
+  document.getElementById('snapList').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-snap]');
+    if (!b) return;
+    var at = b.getAttribute('data-snap');
+    A.confirmDialog({
+      title: '恢复到这份快照',
+      text: '当前记录会被替换成这份快照的内容（当前数据也会先存成快照，可再退回来）。',
+      okText: '恢复'
+    }).then(function (ok) {
+      if (!ok) return;
+      var res = S.restoreSnapshot(at);
+      if (!res.ok) { A.toast(res.error, 'error'); return; }
+      A.loadFoods(true).then(function () { render(); renderSafe(); A.flash('已恢复 ' + res.total + ' 条记录'); });
+    });
+  });
+
+  document.getElementById('exportCorrupt').addEventListener('click', function () {
+    A.download('fatloss-corrupt-' + A.stamp() + '.txt', S.quarantineText());
+    A.flash('已导出损坏副本');
+  });
+
   document.getElementById('goalForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var st = S.loadSettings();
@@ -192,6 +299,8 @@
 
   document.getElementById('exportJson').addEventListener('click', function () {
     A.download('fatloss-backup-' + A.stamp() + '.json', S.exportJSON(), 'application/json');
+    S.markExported();
+    renderSafe();
     A.flash('已导出 JSON 备份');
   });
   document.getElementById('exportEx').addEventListener('click', function () {
@@ -241,8 +350,9 @@
     });
   });
 
-  window.addEventListener('fatloss:change', render);
+  window.addEventListener('fatloss:change', function () { render(); renderSafe(); });
   render();
+  renderSafe();
 })();
 </script>
 </body>
