@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>设置 · 减脂记录</title>
+<meta name="theme-color" content="#16a34a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span><span>减脂记录</span></div>
+    <span class="date-chip" id="storeChip">—</span>
+  </div>
+</header>
+<nav id="nav" class="nav" aria-label="主导航"></nav>
+
+<main class="wrap" id="main">
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">🎯</span>
+      <h2 class="grow">目标设置</h2>
+    </div>
+    <form id="goalForm" autocomplete="off">
+      <div class="field-row">
+        <label class="field"><span class="label">每周运动目标（分钟）</span>
+          <input type="number" id="weeklyGoalMin" min="0" step="10" inputmode="numeric" placeholder="可不填"></label>
+        <label class="field"><span class="label">目标体重（kg）</span>
+          <input type="number" id="targetWeight" min="0" step="0.1" inputmode="decimal" placeholder="可不填"></label>
+      </div>
+      <div class="field-row">
+        <label class="field"><span class="label">每日热量目标（kcal）</span>
+          <input type="number" id="dailyKcal" min="0" step="10" inputmode="numeric" placeholder="可不填"></label>
+        <label class="field"><span class="label">蛋白质目标（g/天）</span>
+          <input type="number" id="protein" min="0" step="1" inputmode="numeric" placeholder="可不填"></label>
+      </div>
+      <div class="field-row">
+        <label class="field"><span class="label">碳水目标（g/天）</span>
+          <input type="number" id="carbs" min="0" step="1" inputmode="numeric" placeholder="可不填"></label>
+        <label class="field"><span class="label">脂肪目标（g/天）</span>
+          <input type="number" id="fat" min="0" step="1" inputmode="numeric" placeholder="可不填"></label>
+      </div>
+      <div class="row mt12">
+        <button class="btn btn-primary" type="submit">保存目标</button>
+        <button class="btn btn-ghost" type="button" id="clearGoal">清空目标</button>
+      </div>
+      <p class="small muted mt8">这些数字只用于首页进度条与统计图上的参考线，不会影响你的记录数据。</p>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">🌗</span>
+      <h2 class="grow">外观</h2>
+    </div>
+    <div class="seg" id="themeSeg">
+      <button data-theme="system">跟随系统</button>
+      <button data-theme="light">浅色</button>
+      <button data-theme="dark">深色</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">💾</span>
+      <h2 class="grow">导出备份</h2>
+    </div>
+    <p class="small muted">JSON 用于完整备份与换设备迁移；CSV 可用 Excel 打开做二次分析。</p>
+    <div class="row mt12" style="flex-wrap:wrap">
+      <button class="btn btn-primary" id="exportJson">导出全部数据（JSON）</button>
+      <button class="btn btn-ghost" id="exportEx">运动记录 CSV</button>
+      <button class="btn btn-ghost" id="exportMeal">饮食记录 CSV</button>
+      <button class="btn btn-ghost" id="exportWeight">体重记录 CSV</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">📥</span>
+      <h2 class="grow">导入恢复</h2>
+    </div>
+    <label class="field"><span class="label">选择 JSON 备份文件</span>
+      <input type="file" id="importFile" accept="application/json,.json"></label>
+    <label class="field"><span class="label">导入方式</span>
+      <select id="importMode">
+        <option value="merge">合并（按 id 去重后追加，保留现有数据）</option>
+        <option value="replace">覆盖（清空现有数据后写入）</option>
+      </select></label>
+    <div class="row mt12">
+      <button class="btn btn-primary" id="importBtn">开始导入</button>
+    </div>
+    <p class="small muted mt8">导入前建议先导出一份当前数据作为保险。</p>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">🧹</span>
+      <h2 class="grow">数据概况</h2>
+    </div>
+    <div class="grid grid-4" id="storeStats"></div>
+    <div class="row mt12">
+      <button class="btn btn-danger" id="clearAll">清空全部数据</button>
+    </div>
+    <p class="small muted mt8">清空会删除本机浏览器里的全部记录与设置，操作不可恢复。</p>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">ℹ️</span>
+      <h2 class="grow">关于</h2>
+    </div>
+    <ul class="list">
+      <li><div class="li-main"><div class="li-title">纯静态、零依赖</div>
+        <div class="li-sub">全部代码是 HTML/CSS/JS，无构建步骤，可直接部署到 GitHub Pages。</div></div></li>
+      <li><div class="li-main"><div class="li-title">数据不出本机</div>
+        <div class="li-sub">使用 localStorage 存储，键名 <code>fatloss.records.v1</code> 与 <code>fatloss.settings.v1</code>，不向任何服务器发送数据。</div></div></li>
+      <li><div class="li-main"><div class="li-title">schema 版本</div>
+        <div class="li-sub">当前版本 v<span id="schemaVer"></span>，导入旧版本数据会自动补齐字段。</div></div></li>
+      <li><div class="li-main"><div class="li-title">食物库为参考值</div>
+        <div class="li-sub">内置营养数据取自常见食物成分表，属于近似值，允许手改或保存自定义食物。</div></div></li>
+    </ul>
+  </section>
+
+  <p class="foot">减脂记录 · 本地版</p>
+</main>
+
+<script src="assets/storage.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  var S = window.FatLossStorage, A = window.FatLossApp;
+  A.applyTheme();
+  A.renderNav('settings.html');
+  document.getElementById('schemaVer').textContent = S.SCHEMA_VERSION;
+
+  var GOAL_IDS = ['weeklyGoalMin', 'targetWeight', 'dailyKcal', 'protein', 'carbs', 'fat'];
+
+  function render() {
+    var st = S.loadSettings();
+    GOAL_IDS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (document.activeElement !== el) el.value = st[id] === null || st[id] === undefined ? '' : st[id];
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('#themeSeg button'), function (b) {
+      b.classList.toggle('active', b.getAttribute('data-theme') === (st.theme || 'system'));
+    });
+
+    var r = S.loadRecords();
+    var bytes = S.storageBytes();
+    document.getElementById('storeStats').innerHTML =
+      '<div class="stat"><div class="k">运动</div><div class="v">' + r.exercises.length + '<small>条</small></div></div>' +
+      '<div class="stat"><div class="k">饮食</div><div class="v">' + r.meals.length + '<small>条</small></div></div>' +
+      '<div class="stat"><div class="k">体重</div><div class="v">' + r.weights.length + '<small>条</small></div></div>' +
+      '<div class="stat"><div class="k">占用</div><div class="v">' + A.fmtNum(bytes / 1024, 1) + '<small>KB</small></div></div>';
+    document.getElementById('storeChip').textContent = '本机存储 ' + A.fmtNum(bytes / 1024, 1) + ' KB';
+  }
+
+  document.getElementById('goalForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var st = S.loadSettings();
+    GOAL_IDS.forEach(function (id) {
+      var v = document.getElementById(id).value;
+      st[id] = v === '' ? null : Number(v);
+    });
+    S.saveSettings(st);
+    A.flash('目标已保存');
+  });
+
+  document.getElementById('clearGoal').addEventListener('click', function () {
+    var st = S.loadSettings();
+    GOAL_IDS.forEach(function (id) { st[id] = null; });
+    S.saveSettings(st);
+    render();
+    A.flash('目标已清空');
+  });
+
+  document.getElementById('themeSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    var st = S.loadSettings();
+    st.theme = b.getAttribute('data-theme');
+    S.saveSettings(st);
+    A.applyTheme();
+    render();
+  });
+
+  document.getElementById('exportJson').addEventListener('click', function () {
+    A.download('fatloss-backup-' + A.stamp() + '.json', S.exportJSON(), 'application/json');
+    A.flash('已导出 JSON 备份');
+  });
+  document.getElementById('exportEx').addEventListener('click', function () {
+    A.download('fatloss-exercise-' + A.stamp() + '.csv', S.exercisesCSV(), 'text/csv');
+    A.flash('已导出运动 CSV');
+  });
+  document.getElementById('exportMeal').addEventListener('click', function () {
+    A.download('fatloss-meals-' + A.stamp() + '.csv', S.mealsCSV(), 'text/csv');
+    A.flash('已导出饮食 CSV');
+  });
+  document.getElementById('exportWeight').addEventListener('click', function () {
+    A.download('fatloss-weight-' + A.stamp() + '.csv', S.weightsCSV(), 'text/csv');
+    A.flash('已导出体重 CSV');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', function () {
+    var input = document.getElementById('importFile');
+    if (!input.files || !input.files.length) { A.toast('请先选择 JSON 文件', 'error'); return; }
+    var mode = document.getElementById('importMode').value;
+    var file = input.files[0];
+    var reader = new FileReader();
+    reader.onload = function () {
+      var res = S.importJSON(String(reader.result), mode);
+      if (!res.ok) { A.toast('导入失败：' + res.error, 'error'); return; }
+      A.loadFoods(true).then(function () {
+        render();
+        A.toast(res.mode === 'replace'
+          ? '已覆盖导入 ' + res.total + ' 条记录'
+          : '已合并导入 ' + res.added + ' 条记录', 'ok');
+      });
+    };
+    reader.onerror = function () { A.toast('文件读取失败', 'error'); };
+    reader.readAsText(file, 'utf-8');
+  });
+
+  document.getElementById('clearAll').addEventListener('click', function () {
+    A.confirmDialog({
+      title: '清空全部数据',
+      text: '将删除本机浏览器中的全部运动、饮食、体重记录与设置。\n此操作不可恢复，建议先导出 JSON 备份。',
+      okText: '确认清空',
+      danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      S.clearAll();
+      A.loadFoods(true).then(render);
+      A.flash('数据已清空');
+    });
+  });
+
+  window.addEventListener('fatloss:change', render);
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>今日 · 减脂记录</title>
+<meta name="description" content="个人减脂记录：每日运动时长与饮食，数据只存在本机浏览器。">
+<meta name="theme-color" content="#16a34a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span><span>减脂记录</span></div>
+    <span class="date-chip" id="todayChip">—</span>
+  </div>
+</header>
+<nav id="nav" class="nav" aria-label="主导航"></nav>
+
+<main class="wrap" id="main">
+
+  <section class="card">
+    <div class="row-between">
+      <h2>今日概览</h2>
+      <span class="tag" id="dayTag"></span>
+    </div>
+    <div class="grid grid-4 mt12">
+      <div class="stat brand">
+        <div class="k">🏃 运动时长</div>
+        <div class="v" id="statMinutes">0<small>分钟</small></div>
+      </div>
+      <div class="stat">
+        <div class="k">🍚 摄入热量</div>
+        <div class="v" id="statKcal">0<small>kcal</small></div>
+      </div>
+      <div class="stat">
+        <div class="k">🥩 蛋白质</div>
+        <div class="v" id="statProtein">0<small>g</small></div>
+      </div>
+      <div class="stat">
+        <div class="k">⚖️ 体重</div>
+        <div class="v" id="statWeight">—<small>kg</small></div>
+      </div>
+    </div>
+
+    <div class="mt16" id="weekBox"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">🏃</span>
+      <h2 class="grow">今日运动</h2>
+      <a class="btn btn-sm btn-primary" href="log.html?add=exercise" id="addExercise">+ 添加</a>
+    </div>
+    <ul class="list" id="exList"></ul>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">🍽️</span>
+      <h2 class="grow">今日饮食</h2>
+      <a class="btn btn-sm btn-primary" href="log.html?add=meal" id="addMeal">+ 添加</a>
+    </div>
+    <div class="grid grid-2">
+      <div class="chart-box"><canvas id="macroChart" data-height="180"></canvas></div>
+      <div class="grid grid-3">
+        <div class="stat"><div class="k">碳水</div><div class="v" id="statCarbs">0<small>g</small></div></div>
+        <div class="stat"><div class="k">脂肪</div><div class="v" id="statFat">0<small>g</small></div></div>
+        <div class="stat"><div class="k">记录</div><div class="v" id="statMeals">0<small>条</small></div></div>
+      </div>
+    </div>
+    <div class="legend" id="macroLegend"></div>
+    <ul class="list mt12" id="mealList"></ul>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">⚖️</span>
+      <h2 class="grow">今日体重</h2>
+      <span class="small muted" id="weightDelta"></span>
+    </div>
+    <div class="row">
+      <input type="number" id="weightInput" step="0.1" min="20" max="400" placeholder="例如 72.4" inputmode="decimal">
+      <button class="btn btn-primary" id="weightSave">保存</button>
+    </div>
+    <p class="small muted mt8">同一天重复保存会覆盖；建议固定时间（如晨起空腹）称重。</p>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">📈</span>
+      <h2 class="grow">最近 7 天运动</h2>
+      <a class="btn btn-sm btn-ghost" href="stats.html">更多统计</a>
+    </div>
+    <div class="chart-box"><canvas id="weekChart" data-height="190"></canvas></div>
+    <div class="legend" id="weekLegend"></div>
+  </section>
+
+  <p class="foot">数据仅保存在本机浏览器（localStorage），不上传任何服务器。</p>
+</main>
+
+<script src="assets/storage.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/charts.js"></script>
+<script>
+(function () {
+  var S = window.FatLossStorage, A = window.FatLossApp, P = window.Charts.PALETTE;
+
+  A.applyTheme();
+  A.renderNav('index.html');
+
+  var today = S.today();
+  document.getElementById('todayChip').textContent = A.dateLabel(today);
+
+  function render() {
+    var s = S.daySummary(today);
+    var st = S.loadSettings();
+
+    document.getElementById('dayTag').textContent = A.relativeDay(today) || today;
+    document.getElementById('statMinutes').innerHTML = A.fmtNum(s.minutes) + '<small>分钟</small>';
+    document.getElementById('statKcal').innerHTML = A.fmtNum(s.kcal) + '<small>kcal</small>';
+    document.getElementById('statProtein').innerHTML = A.fmtNum(s.protein, 1) + '<small>g</small>';
+    document.getElementById('statWeight').innerHTML =
+      (s.weight === null ? '—' : A.fmtNum(s.weight, 1)) + '<small>kg</small>';
+    document.getElementById('statCarbs').innerHTML = A.fmtNum(s.carbs, 1) + '<small>g</small>';
+    document.getElementById('statFat').innerHTML = A.fmtNum(s.fat, 1) + '<small>g</small>';
+    document.getElementById('statMeals').innerHTML = s.meals.length + '<small>条</small>';
+
+    // 周进度
+    var weekMin = S.weekMinutes(today);
+    var weekGoal = st.weeklyGoalMin;
+    document.getElementById('weekBox').innerHTML =
+      '<div class="row-between small muted"><span>本周运动（' + S.weekStart(today) + ' 起）</span>' +
+      '<span>' + A.fmtNum(weekMin) + (weekGoal ? ' / ' + A.fmtNum(weekGoal) : '') + ' 分钟</span></div>' +
+      (weekGoal
+        ? A.progressHtml(weekMin, weekGoal, '周目标完成度')
+        : '<div class="small muted mt8">还没设周运动目标，可以到 <a href="settings.html">设置</a> 填一个（例如 150 分钟）。</div>');
+
+    // 运动列表
+    var exHost = document.getElementById('exList');
+    exHost.innerHTML = s.exercises.length ? s.exercises.map(function (e) {
+      return '<li><div class="li-main"><div class="li-title">' + A.escapeHtml(e.type) +
+        (e.intensity ? ' · ' + A.escapeHtml(e.intensity) + '强度' : '') + '</div>' +
+        '<div class="li-sub">' + A.fmtNum(e.durationMin) + ' 分钟' +
+        (e.calories ? ' · 约 ' + A.fmtNum(e.calories) + ' kcal' : '') +
+        (e.note ? ' · ' + A.escapeHtml(e.note) : '') + '</div></div>' +
+        '<a class="btn btn-sm btn-ghost" href="log.html?date=' + today + '&edit=' + e.id + '">编辑</a></li>';
+    }).join('') : '<li><div class="empty">今天还没有运动记录</div></li>';
+
+    // 饮食列表
+    var mealHost = document.getElementById('mealList');
+    if (!s.meals.length) {
+      mealHost.innerHTML = '<li><div class="empty">今天还没有饮食记录</div></li>';
+    } else {
+      var groups = {};
+      s.meals.forEach(function (m) { (groups[m.meal] = groups[m.meal] || []).push(m); });
+      mealHost.innerHTML = S.MEALS.filter(function (k) { return groups[k]; }).map(function (k) {
+        var items = groups[k];
+        var kcal = items.reduce(function (a, b) { return a + (b.kcal || 0); }, 0);
+        return '<li><div class="li-main"><div class="li-title">' + k +
+          ' <span class="tag">' + A.fmtNum(kcal) + ' kcal</span></div>' +
+          '<div class="li-sub wrap-text">' + items.map(function (m) {
+            return A.escapeHtml(m.name) + (m.amount ? ' ' + A.fmtNum(m.amount) + (m.unit || '') : '');
+          }).join('、') + '</div></div>' +
+          '<a class="btn btn-sm btn-ghost" href="log.html?date=' + today + '">查看</a></li>';
+      }).join('');
+    }
+
+    // 营养占比环形
+    var macro = [
+      { label: '蛋白质', value: Math.round(s.protein * 4), color: P.protein },
+      { label: '碳水', value: Math.round(s.carbs * 4), color: P.carbs },
+      { label: '脂肪', value: Math.round(s.fat * 9), color: P.fat }
+    ];
+    var totalKcal = macro.reduce(function (a, b) { return a + b.value; }, 0);
+    window.Charts.donut(document.getElementById('macroChart'), {
+      items: macro,
+      centerValue: A.fmtNum(totalKcal),
+      centerTitle: '三大营养素 kcal',
+      emptyText: '暂无饮食记录',
+      height: 180
+    });
+    document.getElementById('macroLegend').innerHTML = macro.map(function (m) {
+      var p = totalKcal ? Math.round((m.value / totalKcal) * 100) : 0;
+      return '<span class="item"><span class="swatch" style="background:' + m.color + '"></span>' +
+        m.label + ' ' + p + '%</span>';
+    }).join('');
+
+    // 最近 7 天
+    var dates = S.dateRange(today, 7);
+    var mins = dates.map(function (d) { return S.daySummary(d).minutes; });
+    var perDayGoal = Math.round((st.weeklyGoalMin || 0) / 7);
+    window.Charts.bars(document.getElementById('weekChart'), {
+      labels: dates.map(A.shortDate),
+      data: mins,
+      color: P.brand,
+      name: '运动',
+      unit: '分钟',
+      goal: perDayGoal || null,
+      goalLabel: perDayGoal ? '日均目标 ' + perDayGoal + ' 分钟' : '',
+      emptyText: '最近 7 天还没有运动记录',
+      height: 190
+    });
+    document.getElementById('weekLegend').innerHTML =
+      '<span class="item">合计 ' + A.fmtNum(mins.reduce(function (a, b) { return a + b; }, 0)) +
+      ' 分钟 · 达标 ' + mins.filter(function (m) { return perDayGoal && m >= perDayGoal; }).length + ' 天</span>';
+
+    // 体重
+    var wInput = document.getElementById('weightInput');
+    if (document.activeElement !== wInput) wInput.value = s.weight === null ? '' : s.weight;
+    var all = S.loadRecords().weights.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+    var prev = all.filter(function (w) { return w.date < today; })[0];
+    document.getElementById('weightDelta').textContent = (s.weight !== null && prev)
+      ? '较 ' + prev.date + ' ' + (s.weight - prev.weight >= 0 ? '+' : '') + A.fmtNum(s.weight - prev.weight, 1) + ' kg'
+      : '';
+  }
+
+  document.getElementById('weightSave').addEventListener('click', function () {
+    var v = parseFloat(document.getElementById('weightInput').value);
+    if (!isFinite(v) || v <= 0 || v > 400) { A.toast('请输入 20–400 之间的体重', 'error'); return; }
+    S.upsertWeight(today, v);
+    A.flash('体重已保存');
+  });
+
+  window.addEventListener('fatloss:change', render);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) render(); });
+  render();
+})();
+</script>
+</body>
+</html>

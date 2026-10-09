@@ -1,0 +1,20 @@
+{
+  "name": "减脂记录 · 运动与饮食",
+  "short_name": "减脂记录",
+  "description": "记录每日运动时长与饮食，数据只保存在本机浏览器。",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f7f6",
+  "theme_color": "#16a34a",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

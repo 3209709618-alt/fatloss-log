@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>记录 · 减脂记录</title>
+<meta name="theme-color" content="#16a34a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span><span>减脂记录</span></div>
+    <span class="date-chip" id="sumChip">—</span>
+  </div>
+</header>
+<nav id="nav" class="nav" aria-label="主导航"></nav>
+
+<main class="wrap" id="main">
+
+  <section class="card">
+    <div class="daybar">
+      <button class="btn btn-icon" id="prevDay" title="前一天" aria-label="前一天">‹</button>
+      <div class="center grow">
+        <div class="day-title" id="dayTitle">—</div>
+        <input type="date" id="dateInput" class="mt8">
+      </div>
+      <button class="btn btn-icon" id="nextDay" title="后一天" aria-label="后一天">›</button>
+    </div>
+    <div class="row mt12">
+      <button class="btn btn-sm btn-ghost" id="todayBtn">回到今天</button>
+      <span class="small muted grow center" id="daySummary"></span>
+    </div>
+  </section>
+
+  <!-- ========== 运动 ========== -->
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">🏃</span>
+      <h2 class="grow">运动记录</h2>
+      <button class="btn btn-sm btn-ghost" id="copyYesterday">复制昨天</button>
+    </div>
+
+    <form id="exForm" autocomplete="off">
+      <input type="hidden" id="exId">
+      <div class="field-row">
+        <label class="field"><span class="label">运动类型</span>
+          <select id="exType"></select>
+        </label>
+        <label class="field"><span class="label">强度（可选）</span>
+          <select id="exIntensity"></select>
+        </label>
+      </div>
+      <label class="field"><span class="label">时长（分钟）</span>
+        <div class="stepper">
+          <button class="btn btn-ghost" type="button" data-step="-10">-10</button>
+          <button class="btn btn-ghost" type="button" data-step="-5">-5</button>
+          <input type="number" id="exDuration" min="1" max="1440" step="1" inputmode="numeric" placeholder="30">
+          <button class="btn btn-ghost" type="button" data-step="5">+5</button>
+          <button class="btn btn-ghost" type="button" data-step="10">+10</button>
+        </div>
+      </label>
+      <div class="field-row">
+        <label class="field"><span class="label">消耗（kcal，可选）</span>
+          <input type="number" id="exCalories" min="0" step="1" inputmode="numeric" placeholder="估算值">
+        </label>
+        <label class="field"><span class="label">备注（可选）</span>
+          <input type="text" id="exNote" maxlength="40" placeholder="如 慢跑 6km">
+        </label>
+      </div>
+      <div class="row mt12">
+        <button class="btn btn-primary grow" type="submit" id="exSubmit">添加到当天</button>
+        <button class="btn btn-ghost hidden" type="button" id="exCancel">取消编辑</button>
+      </div>
+    </form>
+
+    <ul class="list mt12" id="exList"></ul>
+  </section>
+
+  <!-- ========== 饮食 ========== -->
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">🍽️</span>
+      <h2 class="grow">饮食记录</h2>
+      <span class="small muted" id="mealSum"></span>
+    </div>
+
+    <form id="mealForm" autocomplete="off">
+      <input type="hidden" id="mealId">
+      <div class="field-row">
+        <label class="field"><span class="label">餐次</span>
+          <select id="mealSlot"></select>
+        </label>
+        <label class="field"><span class="label">食物（可选食物库）</span>
+          <select id="foodSelect"></select>
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field"><span class="label">名称</span>
+          <input type="text" id="foodName" maxlength="60" placeholder="如 鸡胸肉(生)">
+        </label>
+        <label class="field"><span class="label">数量</span>
+          <div class="stepper">
+            <input type="number" id="foodAmount" min="0" step="1" inputmode="decimal" placeholder="100">
+            <select id="foodUnit" style="width:88px">
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+              <option value="个">个</option>
+              <option value="份">份</option>
+            </select>
+          </div>
+        </label>
+      </div>
+      <div class="grid grid-4">
+        <label class="field"><span class="label">热量 kcal</span>
+          <input type="number" id="foodKcal" min="0" step="1" inputmode="numeric"></label>
+        <label class="field"><span class="label">蛋白质 g</span>
+          <input type="number" id="foodProtein" min="0" step="0.1" inputmode="decimal"></label>
+        <label class="field"><span class="label">碳水 g</span>
+          <input type="number" id="foodCarbs" min="0" step="0.1" inputmode="decimal"></label>
+        <label class="field"><span class="label">脂肪 g</span>
+          <input type="number" id="foodFat" min="0" step="0.1" inputmode="decimal"></label>
+      </div>
+      <p class="small muted mt8" id="calcHint">选食物库条目并填数量会自动带出营养；手填同样可用。</p>
+      <div class="field-row">
+        <label class="field"><span class="label">备注（可选）</span>
+          <input type="text" id="mealNote" maxlength="40" placeholder="如 外食，估算">
+        </label>
+        <label class="field"><span class="label">存进我的食物库</span>
+          <select id="saveFood">
+            <option value="0">不保存</option>
+            <option value="1">保存为自定义食物</option>
+          </select>
+        </label>
+      </div>
+      <div class="row mt12">
+        <button class="btn btn-primary grow" type="submit" id="mealSubmit">添加到当天</button>
+        <button class="btn btn-ghost hidden" type="button" id="mealCancel">取消编辑</button>
+      </div>
+    </form>
+
+    <div id="mealGroups" class="mt12"></div>
+  </section>
+
+  <!-- ========== 体重 ========== -->
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">⚖️</span>
+      <h2 class="grow">体重</h2>
+      <span class="small muted" id="weightHint"></span>
+    </div>
+    <div class="row">
+      <input type="number" id="weightInput" step="0.1" min="20" max="400" inputmode="decimal" placeholder="当天体重 kg">
+      <button class="btn btn-primary" id="weightSave">保存</button>
+      <button class="btn btn-ghost hidden" id="weightDelete">删除当天</button>
+    </div>
+  </section>
+
+  <p class="foot">记录即时保存到本机浏览器；换设备请到「设置」导出 JSON 再导入。</p>
+</main>
+
+<script src="assets/storage.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  var S = window.FatLossStorage, A = window.FatLossApp;
+  A.applyTheme();
+  A.renderNav('log.html');
+
+  var params = new URLSearchParams(location.search);
+  var state = {
+    date: /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') || '') ? params.get('date') : S.today(),
+    editEx: null,
+    editMeal: null,
+    foods: []
+  };
+
+  /* ---------- 静态下拉 ---------- */
+  function fill(sel, list, extra) {
+    sel.innerHTML = (extra || []).concat(list.map(function (x) {
+      return '<option value="' + A.escapeHtml(x) + '">' + A.escapeHtml(x) + '</option>';
+    })).join('');
+  }
+  fill(document.getElementById('exType'), S.EX_TYPES);
+  fill(document.getElementById('exIntensity'), S.INTENSITIES, ['<option value="">不填</option>']);
+  fill(document.getElementById('mealSlot'), S.MEALS);
+
+  /* ---------- 食物库 ---------- */
+  function renderFoodOptions() {
+    var sel = document.getElementById('foodSelect');
+    var opts = ['<option value="">— 手动输入 —</option>'];
+    state.foods.forEach(function (f, i) {
+      opts.push('<option value="' + i + '">' + A.escapeHtml(f.name) +
+        (f.custom ? '（我的）' : '') + '</option>');
+    });
+    sel.innerHTML = opts.join('');
+  }
+
+  A.loadFoods().then(function (list) {
+    state.foods = list;
+    renderFoodOptions();
+    if (params.get('add') === 'meal') document.getElementById('foodName').focus();
+  });
+
+  function currentFood() {
+    var v = document.getElementById('foodSelect').value;
+    return v === '' ? null : state.foods[Number(v)] || null;
+  }
+
+  function recalc() {
+    var f = currentFood();
+    var amount = document.getElementById('foodAmount').value;
+    var unit = document.getElementById('foodUnit').value;
+    if (!f) { document.getElementById('calcHint').textContent = '手填模式：请直接填写营养，或从上方选择一个食物。'; return; }
+    if (unit !== f.unit) {
+      document.getElementById('calcHint').textContent = '提示：该食物库条目按「' + f.unit +
+        '」计价，已切换单位后营养不再自动换算，请校对数值。';
+      return;
+    }
+    var n = A.calcNutrients(f, amount);
+    document.getElementById('foodKcal').value = n.kcal || '';
+    document.getElementById('foodProtein').value = n.protein || '';
+    document.getElementById('foodCarbs').value = n.carbs || '';
+    document.getElementById('foodFat').value = n.fat || '';
+    document.getElementById('calcHint').textContent = '按食物库自动计算：' + f.name +
+      '（每' + (f.unit === 'g' ? '100g' : '1' + f.unit) + ' ' + f.kcal + ' kcal）';
+  }
+
+  document.getElementById('foodSelect').addEventListener('change', function () {
+    var f = currentFood();
+    if (f) {
+      document.getElementById('foodName').value = f.name;
+      document.getElementById('foodUnit').value = f.unit;
+      if (!document.getElementById('foodAmount').value) document.getElementById('foodAmount').value = f.unit === 'g' ? 100 : 1;
+    }
+    recalc();
+  });
+  document.getElementById('foodAmount').addEventListener('input', recalc);
+  document.getElementById('foodUnit').addEventListener('change', recalc);
+
+  document.querySelectorAll('#exForm [data-step]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var el = document.getElementById('exDuration');
+      var v = (parseInt(el.value, 10) || 0) + Number(b.getAttribute('data-step'));
+      el.value = Math.max(1, Math.min(1440, v));
+    });
+  });
+
+  /* ---------- 日期切换 ---------- */
+  function setDate(d) {
+    state.date = d;
+    document.getElementById('dateInput').value = d;
+    render();
+  }
+  document.getElementById('prevDay').addEventListener('click', function () { setDate(S.addDays(state.date, -1)); });
+  document.getElementById('nextDay').addEventListener('click', function () { setDate(S.addDays(state.date, 1)); });
+  document.getElementById('todayBtn').addEventListener('click', function () { setDate(S.today()); });
+  document.getElementById('dateInput').addEventListener('change', function (e) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) setDate(e.target.value);
+  });
+
+  /* ---------- 运动表单 ---------- */
+  function resetExForm() {
+    state.editEx = null;
+    document.getElementById('exId').value = '';
+    document.getElementById('exDuration').value = '';
+    document.getElementById('exCalories').value = '';
+    document.getElementById('exNote').value = '';
+    document.getElementById('exIntensity').value = '';
+    document.getElementById('exSubmit').textContent = '添加到当天';
+    document.getElementById('exCancel').classList.add('hidden');
+  }
+
+  document.getElementById('exForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var data = {
+      date: state.date,
+      type: document.getElementById('exType').value,
+      durationMin: parseInt(document.getElementById('exDuration').value, 10),
+      intensity: document.getElementById('exIntensity').value,
+      calories: document.getElementById('exCalories').value === '' ? null : Number(document.getElementById('exCalories').value),
+      note: document.getElementById('exNote').value.trim()
+    };
+    if (!isFinite(data.durationMin) || data.durationMin <= 0) { A.toast('请填写运动时长（分钟）', 'error'); return; }
+    if (state.editEx) { S.updateExercise(state.editEx, data); A.flash('已更新运动记录'); }
+    else { S.addExercise(data); A.flash('已添加 ' + data.durationMin + ' 分钟运动'); }
+    resetExForm();
+  });
+
+  document.getElementById('exCancel').addEventListener('click', resetExForm);
+
+  document.getElementById('copyYesterday').addEventListener('click', function () {
+    var prev = S.addDays(state.date, -1);
+    var items = S.byDate(prev).exercises;
+    if (!items.length) { A.toast('昨天没有运动记录', 'error'); return; }
+    items.forEach(function (e) {
+      S.addExercise({ date: state.date, type: e.type, durationMin: e.durationMin, intensity: e.intensity, calories: e.calories, note: e.note });
+    });
+    A.flash('已复制昨天 ' + items.length + ' 条运动');
+  });
+
+  /* ---------- 饮食表单 ---------- */
+  function resetMealForm() {
+    state.editMeal = null;
+    document.getElementById('mealId').value = '';
+    ['foodName', 'foodAmount', 'foodKcal', 'foodProtein', 'foodCarbs', 'foodFat', 'mealNote'].forEach(function (id) {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('foodSelect').value = '';
+    document.getElementById('saveFood').value = '0';
+    document.getElementById('mealSubmit').textContent = '添加到当天';
+    document.getElementById('mealCancel').classList.add('hidden');
+  }
+
+  document.getElementById('mealForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = document.getElementById('foodName').value.trim();
+    if (!name) { A.toast('请填写食物名称', 'error'); return; }
+    var val = function (id) {
+      var v = document.getElementById(id).value;
+      return v === '' ? null : Number(v);
+    };
+    var data = {
+      date: state.date,
+      meal: document.getElementById('mealSlot').value,
+      name: name,
+      amount: val('foodAmount'),
+      unit: document.getElementById('foodUnit').value,
+      kcal: val('foodKcal'),
+      protein: val('foodProtein'),
+      carbs: val('foodCarbs'),
+      fat: val('foodFat'),
+      note: document.getElementById('mealNote').value.trim()
+    };
+    if (state.editMeal) { S.updateMeal(state.editMeal, data); A.flash('已更新饮食记录'); }
+    else { S.addMeal(data); A.flash('已添加：' + name); }
+
+    if (!state.editMeal && document.getElementById('saveFood').value === '1') {
+      S.addCustomFood({
+        name: name,
+        unit: data.unit,
+        kcal: data.unit === 'g' && data.amount ? Math.round((data.kcal || 0) / data.amount * 100) : (data.kcal || 0),
+        protein: data.unit === 'g' && data.amount ? Math.round((data.protein || 0) / data.amount * 1000) / 10 : (data.protein || 0),
+        carbs: data.unit === 'g' && data.amount ? Math.round((data.carbs || 0) / data.amount * 1000) / 10 : (data.carbs || 0),
+        fat: data.unit === 'g' && data.amount ? Math.round((data.fat || 0) / data.amount * 1000) / 10 : (data.fat || 0)
+      });
+      A.loadFoods(true).then(function (list) { state.foods = list; renderFoodOptions(); });
+      A.toast('已加入「我的食物库」', 'ok');
+    }
+    resetMealForm();
+  });
+
+  document.getElementById('mealCancel').addEventListener('click', resetMealForm);
+
+  /* ---------- 体重 ---------- */
+  document.getElementById('weightSave').addEventListener('click', function () {
+    var v = parseFloat(document.getElementById('weightInput').value);
+    if (!isFinite(v) || v <= 0 || v > 400) { A.toast('请输入 20–400 之间的体重', 'error'); return; }
+    S.upsertWeight(state.date, v);
+    A.flash('体重已保存');
+  });
+  document.getElementById('weightDelete').addEventListener('click', function () {
+    var rows = S.byDate(state.date).weights;
+    if (!rows.length) return;
+    A.confirmDialog({ title: '删除当天体重', text: state.date + ' 的体重记录将被删除。', okText: '删除', danger: true })
+      .then(function (ok) { if (ok) { S.removeWeight(rows[0].id); A.flash('已删除'); } });
+  });
+
+  /* ---------- 渲染 ---------- */
+  function render() {
+    var s = S.daySummary(state.date);
+    document.getElementById('dateInput').value = state.date;
+    document.getElementById('dayTitle').textContent = A.dateLabel(state.date) +
+      (A.relativeDay(state.date) ? '（' + A.relativeDay(state.date) + '）' : '');
+    document.getElementById('sumChip').textContent = state.date;
+    document.getElementById('daySummary').textContent =
+      '运动 ' + A.fmtNum(s.minutes) + ' 分钟 · 摄入 ' + A.fmtNum(s.kcal) + ' kcal · 体重 ' +
+      (s.weight === null ? '—' : A.fmtNum(s.weight, 1) + ' kg');
+    document.getElementById('mealSum').textContent =
+      '合计 ' + A.fmtNum(s.kcal) + ' kcal｜蛋白 ' + A.fmtNum(s.protein, 1) +
+      'g｜碳水 ' + A.fmtNum(s.carbs, 1) + 'g｜脂肪 ' + A.fmtNum(s.fat, 1) + 'g';
+
+    // 运动列表
+    var exList = document.getElementById('exList');
+    exList.innerHTML = s.exercises.length ? s.exercises.map(function (e) {
+      return '<li><div class="li-main"><div class="li-title">' + A.escapeHtml(e.type) +
+        '<span class="tag brand">' + A.fmtNum(e.durationMin) + ' 分钟</span>' +
+        (e.intensity ? '<span class="tag">' + A.escapeHtml(e.intensity) + '</span>' : '') +
+        (e.calories ? '<span class="tag">' + A.fmtNum(e.calories) + ' kcal</span>' : '') + '</div>' +
+        (e.note ? '<div class="li-sub">' + A.escapeHtml(e.note) + '</div>' : '') + '</div>' +
+        '<div class="li-actions">' +
+        '<button class="btn btn-icon" data-act="edit-ex" data-id="' + e.id + '" title="编辑">✎</button>' +
+        '<button class="btn btn-icon" data-act="del-ex" data-id="' + e.id + '" title="删除">🗑</button>' +
+        '</div></li>';
+    }).join('') : '<li><div class="empty">这一天还没有运动记录</div></li>';
+
+    // 饮食分组列表
+    var groups = {};
+    s.meals.forEach(function (m) { (groups[m.meal] = groups[m.meal] || []).push(m); });
+    var host = document.getElementById('mealGroups');
+    var html = S.MEALS.filter(function (k) { return groups[k]; }).map(function (k) {
+      var items = groups[k];
+      var kcal = items.reduce(function (a, b) { return a + (b.kcal || 0); }, 0);
+      return '<div class="card-head"><h3 class="grow">' + k + '</h3><span class="tag">' + A.fmtNum(kcal) + ' kcal</span></div>' +
+        '<ul class="list">' + items.map(function (m) {
+          var macro = [];
+          if (m.protein) macro.push('蛋 ' + A.fmtNum(m.protein, 1) + 'g');
+          if (m.carbs) macro.push('碳 ' + A.fmtNum(m.carbs, 1) + 'g');
+          if (m.fat) macro.push('脂 ' + A.fmtNum(m.fat, 1) + 'g');
+          return '<li><div class="li-main"><div class="li-title">' + A.escapeHtml(m.name) +
+            (m.amount ? ' <span class="tag">' + A.fmtNum(m.amount) + A.escapeHtml(m.unit || '') + '</span>' : '') +
+            (m.kcal ? '<span class="tag brand">' + A.fmtNum(m.kcal) + ' kcal</span>' : '') + '</div>' +
+            '<div class="li-sub">' + (macro.join(' · ') || '未填营养') +
+            (m.note ? ' · ' + A.escapeHtml(m.note) : '') + '</div></div>' +
+            '<div class="li-actions">' +
+            '<button class="btn btn-icon" data-act="edit-meal" data-id="' + m.id + '" title="编辑">✎</button>' +
+            '<button class="btn btn-icon" data-act="del-meal" data-id="' + m.id + '" title="删除">🗑</button>' +
+            '</div></li>';
+        }).join('') + '</ul>';
+    }).join('');
+    host.innerHTML = html || '<div class="empty">这一天还没有饮食记录</div>';
+
+    // 体重
+    var wInput = document.getElementById('weightInput');
+    if (document.activeElement !== wInput) wInput.value = s.weight === null ? '' : s.weight;
+    document.getElementById('weightDelete').classList.toggle('hidden', s.weight === null);
+    document.getElementById('weightHint').textContent = s.weight === null ? '当天未记录' : '已记录 ' + A.fmtNum(s.weight, 1) + ' kg';
+  }
+
+  /* ---------- 列表事件委托 ---------- */
+  document.getElementById('main').addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!btn) return;
+    var id = btn.getAttribute('data-id');
+    var act = btn.getAttribute('data-act');
+
+    if (act === 'del-ex') {
+      A.confirmDialog({ title: '删除运动记录', text: '删除后无法恢复。', okText: '删除', danger: true })
+        .then(function (ok) { if (ok) { S.removeExercise(id); A.flash('已删除'); } });
+    } else if (act === 'edit-ex') {
+      var ex = S.loadRecords().exercises.filter(function (x) { return x.id === id; })[0];
+      if (!ex) return;
+      state.editEx = id;
+      document.getElementById('exId').value = id;
+      document.getElementById('exType').value = ex.type;
+      document.getElementById('exIntensity').value = ex.intensity || '';
+      document.getElementById('exDuration').value = ex.durationMin;
+      document.getElementById('exCalories').value = ex.calories === null || ex.calories === undefined ? '' : ex.calories;
+      document.getElementById('exNote').value = ex.note || '';
+      document.getElementById('exSubmit').textContent = '更新这条记录';
+      document.getElementById('exCancel').classList.remove('hidden');
+      document.getElementById('exForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (act === 'del-meal') {
+      A.confirmDialog({ title: '删除饮食记录', text: '删除后无法恢复。', okText: '删除', danger: true })
+        .then(function (ok) { if (ok) { S.removeMeal(id); A.flash('已删除'); } });
+    } else if (act === 'edit-meal') {
+      var m = S.loadRecords().meals.filter(function (x) { return x.id === id; })[0];
+      if (!m) return;
+      state.editMeal = id;
+      document.getElementById('mealId').value = id;
+      document.getElementById('mealSlot').value = m.meal;
+      document.getElementById('foodSelect').value = '';
+      document.getElementById('foodName').value = m.name;
+      document.getElementById('foodAmount').value = m.amount === null || m.amount === undefined ? '' : m.amount;
+      document.getElementById('foodUnit').value = m.unit || 'g';
+      document.getElementById('foodKcal').value = m.kcal === null || m.kcal === undefined ? '' : m.kcal;
+      document.getElementById('foodProtein').value = m.protein === null || m.protein === undefined ? '' : m.protein;
+      document.getElementById('foodCarbs').value = m.carbs === null || m.carbs === undefined ? '' : m.carbs;
+      document.getElementById('foodFat').value = m.fat === null || m.fat === undefined ? '' : m.fat;
+      document.getElementById('mealNote').value = m.note || '';
+      document.getElementById('saveFood').value = '0';
+      document.getElementById('mealSubmit').textContent = '更新这条记录';
+      document.getElementById('mealCancel').classList.remove('hidden');
+      document.getElementById('mealForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  window.addEventListener('fatloss:change', render);
+  setDate(state.date);
+
+  if (params.get('add') === 'exercise') {
+    document.getElementById('exForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('exDuration').focus();
+  }
+})();
+</script>
+</body>
+</html>
