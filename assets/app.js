@@ -124,6 +124,7 @@
   var NAV = [
     { href: 'index.html', label: '今日', icon: '🏠' },
     { href: 'log.html', label: '记录', icon: '✍️' },
+    { href: 'history.html', label: '历史', icon: '📅' },
     { href: 'stats.html', label: '统计', icon: '📈' },
     { href: 'settings.html', label: '设置', icon: '⚙️' }
   ];

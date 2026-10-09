@@ -182,35 +182,59 @@
 
   /* ---------------- 读写 ---------------- */
 
-  var cache = { records: null, settings: null };
+  /* 缓存按「localStorage 里的原始串」失效：别的标签页写过、或用户清过浏览器数据后，
+     这里读到的才是最新值，避免用旧缓存把别人的记录覆盖掉。 */
+  var cache = { records: null, recordsRaw: null, settings: null, settingsRaw: null };
+
+  function readRaw(key) {
+    try { return global.localStorage.getItem(key); } catch (e) { return null; }
+  }
+
+  function parseRaw(raw, label) {
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) {
+      console.warn('[storage] 解析失败，按空数据处理:', label, e);
+      return null;
+    }
+  }
 
   function loadRecords() {
-    if (!cache.records) cache.records = migrateRecords(readJSON(RECORDS_KEY, null));
+    var raw = readRaw(RECORDS_KEY);
+    if (cache.records && cache.recordsRaw === raw) return cache.records;
+    cache.records = migrateRecords(parseRaw(raw, RECORDS_KEY));
+    cache.recordsRaw = raw;
     return cache.records;
   }
 
   function saveRecords(records) {
     cache.records = records;
-    writeJSON(RECORDS_KEY, records);
+    var ok = writeJSON(RECORDS_KEY, records);
+    cache.recordsRaw = ok === false ? null : JSON.stringify(records);
     emit();
     return records;
   }
 
   function loadSettings() {
-    if (!cache.settings) cache.settings = migrateSettings(readJSON(SETTINGS_KEY, null));
+    var raw = readRaw(SETTINGS_KEY);
+    if (cache.settings && cache.settingsRaw === raw) return cache.settings;
+    cache.settings = migrateSettings(parseRaw(raw, SETTINGS_KEY));
+    cache.settingsRaw = raw;
     return cache.settings;
   }
 
   function saveSettings(s) {
     cache.settings = migrateSettings(s);
-    writeJSON(SETTINGS_KEY, cache.settings);
+    var ok = writeJSON(SETTINGS_KEY, cache.settings);
+    cache.settingsRaw = ok === false ? null : JSON.stringify(cache.settings);
     emit();
     return cache.settings;
   }
 
   function invalidate() {
     cache.records = null;
+    cache.recordsRaw = null;
     cache.settings = null;
+    cache.settingsRaw = null;
   }
 
   /* ---------------- 增删改 ---------------- */
@@ -530,6 +554,16 @@
     loadRecords();
     loadSettings();
     emit();
+  }
+
+  /* 其它标签页写入/清空后，本页缓存失效并通知界面重绘 */
+  if (global.addEventListener) {
+    global.addEventListener('storage', function (e) {
+      if (!e || e.key === null || e.key === RECORDS_KEY || e.key === SETTINGS_KEY) {
+        invalidate();
+        emit();
+      }
+    });
   }
 
   global.FatLossStorage = {
