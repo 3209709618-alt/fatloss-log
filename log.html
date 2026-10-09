@@ -22,13 +22,22 @@
 <main class="wrap" id="main">
 
   <section class="card">
-    <div class="daybar">
-      <button class="btn btn-icon" id="prevDay" title="前一天" aria-label="前一天">‹</button>
-      <div class="center grow">
-        <div class="day-title" id="dayTitle">—</div>
-        <input type="date" id="dateInput" class="mt8">
+    <div class="daynav">
+      <button class="iconbtn" id="prevDay" type="button" title="前一天" aria-label="前一天">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="daynav-center">
+        <div class="daynav-title" id="dayTitle">—</div>
+        <div class="daynav-sub" id="daySub">—</div>
+        <input type="date" id="dateInput" class="daynav-input" aria-label="选择日期">
       </div>
-      <button class="btn btn-icon" id="nextDay" title="后一天" aria-label="后一天">›</button>
+      <button class="iconbtn" id="nextDay" type="button" title="后一天" aria-label="后一天">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="daynav-hint">
+      <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10.5h17M8 3.6v3.4M16 3.6v3.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>点中间日期可直接跳转，左右箭头切换前后一天</span>
     </div>
     <div class="row mt12">
       <button class="btn btn-sm btn-ghost" id="todayBtn">回到今天</button>
@@ -250,9 +259,15 @@
   });
 
   /* ---------- 日期切换 ---------- */
+  function syncDateUI() {
+    var d = state.date;
+    document.getElementById('dateInput').value = d;
+    document.getElementById('dayTitle').textContent = A.dateLabel(d);
+    document.getElementById('daySub').textContent = A.relativeDay(d) || (d.slice(0, 4) + '年');
+  }
   function setDate(d) {
     state.date = d;
-    document.getElementById('dateInput').value = d;
+    syncDateUI();
     render();
   }
   document.getElementById('prevDay').addEventListener('click', function () { setDate(S.addDays(state.date, -1)); });
@@ -372,9 +387,7 @@
   /* ---------- 渲染 ---------- */
   function render() {
     var s = S.daySummary(state.date);
-    document.getElementById('dateInput').value = state.date;
-    document.getElementById('dayTitle').textContent = A.dateLabel(state.date) +
-      (A.relativeDay(state.date) ? '（' + A.relativeDay(state.date) + '）' : '');
+    syncDateUI();
     document.getElementById('sumChip').textContent = state.date;
     document.getElementById('daySummary').textContent =
       '运动 ' + A.fmtNum(s.minutes) + ' 分钟 · 摄入 ' + A.fmtNum(s.kcal) + ' kcal · 体重 ' +

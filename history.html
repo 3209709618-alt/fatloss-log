@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>历史 · 减脂记录</title>
+<meta name="theme-color" content="#16a34a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span><span>减脂记录</span></div>
+    <span class="date-chip" id="monthChip">—</span>
+  </div>
+</header>
+<nav id="nav" class="nav" aria-label="主导航"></nav>
+
+<main class="wrap" id="main">
+
+  <!-- ========== 月历 ========== -->
+  <section class="card">
+    <div class="calbar">
+      <button class="iconbtn" id="prevMonth" type="button" title="上个月" aria-label="上个月">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="calbar-title">
+        <span id="monthLabel">—</span>
+        <small id="monthSub"></small>
+      </div>
+      <button class="iconbtn" id="nextMonth" type="button" title="下个月" aria-label="下个月">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div class="cal-week" aria-hidden="true">
+      <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+    </div>
+    <div class="cal-grid" id="calGrid" aria-label="月历"></div>
+
+    <div class="cal-legend">
+      <span><i></i>有运动</span>
+      <span><i class="diet"></i>有饮食</span>
+      <span><i class="weight"></i>有体重</span>
+    </div>
+
+    <div class="row mt12">
+      <button class="btn btn-sm btn-ghost" id="todayBtn" type="button">回到今天</button>
+      <span class="small muted grow center" id="monthSummary"></span>
+    </div>
+  </section>
+
+  <!-- ========== 选中那天的记录 ========== -->
+  <section class="card">
+    <div class="card-head">
+      <span class="icon">📅</span>
+      <h2 class="grow" id="dayTitle">—</h2>
+      <a class="btn btn-sm btn-primary" id="editDay" href="log.html">去记录</a>
+    </div>
+
+    <div class="grid grid-4">
+      <div class="stat brand">
+        <div class="k">🏃 运动时长</div>
+        <div class="v" id="dMinutes">0<small>分钟</small></div>
+      </div>
+      <div class="stat">
+        <div class="k">🍚 摄入热量</div>
+        <div class="v" id="dKcal">0<small>kcal</small></div>
+      </div>
+      <div class="stat">
+        <div class="k">🥩 蛋白质</div>
+        <div class="v" id="dProtein">0<small>g</small></div>
+      </div>
+      <div class="stat">
+        <div class="k">⚖️ 体重</div>
+        <div class="v" id="dWeight">—<small>kg</small></div>
+      </div>
+    </div>
+
+    <div class="row-between mt16">
+      <h2>🏃 运动</h2>
+      <span class="small muted" id="dExMeta"></span>
+    </div>
+    <ul class="list" id="exList"></ul>
+
+    <div class="row-between mt16">
+      <h2>🍽️ 饮食</h2>
+      <span class="small muted" id="dMealMeta"></span>
+    </div>
+    <ul class="list" id="mealList"></ul>
+  </section>
+
+  <p class="foot">历史页只读取本机浏览器里的记录；换手机或换浏览器时用「设置 → 导出 JSON」迁移。</p>
+</main>
+
+<script src="assets/storage.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  var S = window.FatLossStorage, A = window.FatLossApp;
+  A.applyTheme();
+  A.renderNav('history.html');
+
+  var TODAY = S.today();
+  var state = { ym: TODAY.slice(0, 7), date: TODAY };
+  var DAYS = {};
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function monthLabel(ym) { var p = ym.split('-'); return Number(p[0]) + '年' + Number(p[1]) + '月'; }
+  function ymd(ym, day) { return ym + '-' + pad(day); }
+  function daysInMonth(ym) { var p = ym.split('-'); return new Date(Number(p[0]), Number(p[1]), 0).getDate(); }
+  // 周一作为一周的第一天：Date.getDay() 里 0 是周日 → 顺移成 6
+  function firstOffset(ym) { var p = ym.split('-'); return (new Date(Number(p[0]), Number(p[1]) - 1, 1).getDay() + 6) % 7; }
+  function shiftMonth(ym, delta) {
+    var p = ym.split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1 + delta, 1);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1);
+  }
+
+  /* ---------- 按日期汇总全部记录 ---------- */
+  function aggregate() {
+    var rec = S.loadRecords(), map = {};
+    function slot(d) { return map[d] || (map[d] = { minutes: 0, types: [], kcal: 0, meals: 0, weight: null }); }
+    (rec.exercises || []).forEach(function (e) {
+      var s = slot(e.date);
+      s.minutes += e.durationMin || 0;
+      if (e.type && s.types.indexOf(e.type) < 0) s.types.push(e.type);
+    });
+    (rec.meals || []).forEach(function (m) {
+      var s = slot(m.date);
+      s.meals += 1;
+      s.kcal += m.kcal || 0;
+    });
+    (rec.weights || []).forEach(function (w) { slot(w.date).weight = w.weight; });
+    return map;
+  }
+
+  /* ---------- 月历 ---------- */
+  function renderCalendar() {
+    var total = daysInMonth(state.ym);
+    var offset = firstOffset(state.ym);
+    var html = '', i;
+    for (i = 0; i < offset; i++) html += '<div class="cal-cell pad" aria-hidden="true"></div>';
+    for (var day = 1; day <= total; day++) {
+      var d = ymd(state.ym, day);
+      var s = DAYS[d];
+      var cls = 'cal-cell';
+      if (d === TODAY) cls += ' today';
+      if (d === state.date) cls += ' sel';
+      var inner = '<span class="d">' + day + '</span>';
+      if (s) {
+        if (s.minutes > 0) inner += '<span class="m">' + s.minutes + '分</span>';
+        if (s.types.length) inner += '<span class="t">' + A.escapeHtml(s.types.slice(0, 2).join('·')) + '</span>';
+        var dots = '';
+        if (s.minutes > 0) dots += '<i></i>';
+        if (s.meals > 0) dots += '<i class="diet"></i>';
+        if (s.weight !== null) dots += '<i class="weight"></i>';
+        if (dots) inner += '<span class="dots">' + dots + '</span>';
+      }
+      html += '<button type="button" class="' + cls + '" data-date="' + d + '">' + inner + '</button>';
+    }
+    document.getElementById('calGrid').innerHTML = html;
+
+    // 本月小结
+    var minutes = 0, active = 0, kcal = 0, mealDays = 0, ws = [];
+    for (var day2 = 1; day2 <= total; day2++) {
+      var s2 = DAYS[ymd(state.ym, day2)];
+      if (!s2) continue;
+      active += 1;
+      minutes += s2.minutes;
+      if (s2.meals > 0) { mealDays += 1; kcal += s2.kcal; }
+      if (s2.weight !== null) ws.push({ d: ymd(state.ym, day2), v: s2.weight });
+    }
+    ws.sort(function (a, b) { return a.d < b.d ? -1 : 1; });
+
+    document.getElementById('monthLabel').textContent = monthLabel(state.ym);
+    document.getElementById('monthSub').textContent = active ? '有记录 ' + active + ' 天' : '这个月还没有记录';
+    document.getElementById('monthChip').textContent = monthLabel(state.ym);
+    var parts = ['本月运动 ' + A.fmtNum(minutes) + ' 分钟'];
+    if (mealDays) parts.push('日均摄入 ' + A.fmtNum(kcal / mealDays) + ' kcal');
+    if (ws.length > 1) {
+      parts.push('体重 ' + A.fmtNum(ws[0].v, 1) + '→' + A.fmtNum(ws[ws.length - 1].v, 1) + ' kg');
+    } else if (ws.length === 1) {
+      parts.push('体重 ' + A.fmtNum(ws[0].v, 1) + ' kg');
+    }
+    document.getElementById('monthSummary').textContent = parts.join(' · ');
+  }
+
+  /* ---------- 选中那天的明细 ---------- */
+  function renderDetail() {
+    var d = state.date;
+    var s = S.daySummary(d);
+    var rel = A.relativeDay(d);
+    document.getElementById('dayTitle').textContent = A.dateLabel(d) + (rel ? '（' + rel + '）' : '');
+    document.getElementById('editDay').href = 'log.html?date=' + encodeURIComponent(d);
+    document.getElementById('dMinutes').innerHTML = A.fmtNum(s.minutes) + '<small>分钟</small>';
+    document.getElementById('dKcal').innerHTML = A.fmtNum(s.kcal) + '<small>kcal</small>';
+    document.getElementById('dProtein').innerHTML = A.fmtNum(s.protein, 1) + '<small>g</small>';
+    document.getElementById('dWeight').innerHTML = (s.weight === null ? '—' : A.fmtNum(s.weight, 1)) + '<small>kg</small>';
+
+    document.getElementById('dExMeta').textContent = s.exercises.length ? s.exercises.length + ' 条记录' : '';
+    document.getElementById('exList').innerHTML = s.exercises.length ? s.exercises.map(function (e) {
+      return '<li><div class="li-main"><div class="li-title">' + A.escapeHtml(e.type) +
+        '<span class="tag brand">' + A.fmtNum(e.durationMin) + ' 分钟</span>' +
+        (e.intensity ? '<span class="tag">' + A.escapeHtml(e.intensity) + '</span>' : '') +
+        (e.calories ? '<span class="tag">' + A.fmtNum(e.calories) + ' kcal</span>' : '') +
+        '</div>' + (e.note ? '<div class="li-sub">' + A.escapeHtml(e.note) + '</div>' : '') + '</div></li>';
+    }).join('') : '<li><div class="empty">这天没有运动记录</div></li>';
+
+    var total = s.kcal;
+    document.getElementById('dMealMeta').textContent = s.meals.length ? '合计 ' + A.fmtNum(total) + ' kcal' : '';
+    document.getElementById('mealList').innerHTML = s.meals.length ? s.meals.map(function (m) {
+      return '<li><div class="li-main"><div class="li-title">' + A.escapeHtml(m.name) +
+        '<span class="tag">' + A.escapeHtml(m.meal) + '</span></div>' +
+        '<div class="li-sub">' + A.fmtNum(m.amount) + ' ' + A.escapeHtml(m.unit) + ' · ' +
+        A.fmtNum(m.kcal) + ' kcal · 蛋白 ' + A.fmtNum(m.protein, 1) + 'g / 碳水 ' +
+        A.fmtNum(m.carbs, 1) + 'g / 脂肪 ' + A.fmtNum(m.fat, 1) + 'g</div></div></li>';
+    }).join('') : '<li><div class="empty">这天没有饮食记录</div></li>';
+  }
+
+  function render() {
+    DAYS = aggregate();
+    renderCalendar();
+    renderDetail();
+  }
+
+  /* ---------- 交互 ---------- */
+  document.getElementById('prevMonth').addEventListener('click', function () {
+    state.ym = shiftMonth(state.ym, -1);
+    renderCalendar();
+  });
+  document.getElementById('nextMonth').addEventListener('click', function () {
+    state.ym = shiftMonth(state.ym, 1);
+    renderCalendar();
+  });
+  document.getElementById('todayBtn').addEventListener('click', function () {
+    state.ym = TODAY.slice(0, 7);
+    state.date = TODAY;
+    render();
+  });
+  document.getElementById('calGrid').addEventListener('click', function (e) {
+    var el = e.target;
+    while (el && el !== this && !el.getAttribute('data-date')) el = el.parentNode;
+    if (!el || el === this) return;
+    var d = el.getAttribute('data-date');
+    if (!d) return;
+    state.date = d;
+    var ym = d.slice(0, 7);
+    if (ym !== state.ym) { state.ym = ym; render(); return; }
+    renderCalendar();
+    renderDetail();
+  });
+  window.addEventListener('fatloss:change', render);
+
+  render();
+})();
+</script>
+</body>
+</html>
