@@ -283,8 +283,8 @@
   }
 
   var STATUS_TEXT = {
-    'loading tesseract core': '正在加载识别内核…',
-    'initializing tesseract': '正在初始化…',
+    'loading tesseract core': '正在加载识别内核（首次约 4.7 MB，之后走缓存）…',
+    'initializing tesseract': '正在初始化识别引擎…',
     'loading language traineddata': '正在加载中英文语言包（约 3.7 MB，只需一次）…',
     'initializing api': '正在准备识别…',
     'recognizing text': '正在识别文字…'
