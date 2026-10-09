@@ -124,10 +124,25 @@
   var NAV = [
     { href: 'index.html', label: '今日', icon: '🏠' },
     { href: 'log.html', label: '记录', icon: '✍️' },
-    { href: 'history.html', label: '历史', icon: '📅' },
+    { href: 'history.html', label: '历史', cal: true },
     { href: 'stats.html', label: '统计', icon: '📈' },
     { href: 'settings.html', label: '设置', icon: '⚙️' }
   ];
+
+  // 「历史」的图标画成日历，格子里显示当天日期（跟随系统日期）
+  function todayDay() {
+    return String(new Date().getDate());
+  }
+
+  function navIconHtml(n) {
+    if (n.cal) {
+      return '<span class="nav-icon nav-icon-cal" aria-hidden="true">' +
+        '<span class="cal-ico"><i></i><b>' + todayDay() + '</b></span></span>';
+    }
+    return '<span class="nav-icon" aria-hidden="true">' + n.icon + '</span>';
+  }
+
+  var navDayTimer = null;
 
   function renderNav(active) {
     var host = $('#nav');
@@ -136,9 +151,18 @@
     host.innerHTML = NAV.map(function (n) {
       var on = n.href === file ? ' active' : '';
       return '<a class="nav-link' + on + '" href="' + n.href + '">' +
-        '<span class="nav-icon" aria-hidden="true">' + n.icon + '</span>' +
+        navIconHtml(n) +
         '<span class="nav-text">' + n.label + '</span></a>';
     }).join('');
+    // 页面一直开着跨过午夜时，把日期图标刷成新的「今天」
+    if (!navDayTimer) {
+      var shown = todayDay();
+      navDayTimer = setInterval(function () {
+        if (todayDay() === shown) return;
+        shown = todayDay();
+        if (document.body.contains(host)) renderNav(file);
+      }, 60000);
+    }
   }
 
   /* ---------------- 食物库 ---------------- */

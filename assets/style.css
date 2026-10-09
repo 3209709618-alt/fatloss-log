@@ -132,6 +132,19 @@ h3 { font-size: 15px; }
 .nav-link.active { color: var(--brand); font-weight: 650; }
 .nav-link.active .nav-icon { filter: none; transform: translateY(-1px); }
 
+/* 「历史」图标：日历样式，格子里是当天日期（尺寸随 .nav-icon 的 font-size 缩放） */
+.nav-link .nav-icon-cal { filter: none; }
+.cal-ico {
+  position: relative; display: inline-flex; align-items: flex-end; justify-content: center;
+  width: 1.05em; height: 1.05em; box-sizing: border-box;
+  border: 0.085em solid currentColor; border-radius: 0.26em; overflow: hidden;
+}
+.cal-ico i { position: absolute; top: 0; left: 0; right: 0; height: 0.3em; background: var(--brand); }
+.cal-ico b {
+  font-size: 0.58em; font-weight: 700; line-height: 1; margin-bottom: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- 卡片 ---------- */
 .card {
   background: var(--bg-elev);
