@@ -145,6 +145,17 @@ h3 { font-size: 15px; }
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- 数据安全横幅 ---------- */
+.banner { border-radius: var(--radius); padding: 10px 12px; margin-bottom: 12px; border: 1px solid transparent; }
+.banner:empty { display: none; }
+.banner-danger { background: rgba(220, 38, 38, 0.13); border-color: rgba(220, 38, 38, 0.45); }
+.banner-warn { background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.45); }
+.banner-line { font-size: 13px; line-height: 1.5; }
+.banner-line + .banner-line { margin-top: 6px; }
+.banner-actions { margin-top: 8px; }
+.banner .btn { padding: 6px 12px; font-size: 13px; }
+.stat .v-sm { font-size: 15px; }
+
 /* ---------- 卡片 ---------- */
 .card {
   background: var(--bg-elev);
