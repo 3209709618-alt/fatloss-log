@@ -163,6 +163,8 @@
         if (document.body.contains(host)) renderNav(file);
       }, 60000);
     }
+    // 导航在每个页面初始化时都会渲染一次，顺手做一次存储体检
+    renderStorageBanner();
   }
 
   /* ---------------- 食物库 ---------------- */
@@ -234,6 +236,45 @@
 
   function flash(msg) { toast(msg, 'ok'); }
 
+  /* ---------------- 数据安全横幅 ----------------
+     一旦本机存储写不进去（无痕模式、被系统限制、空间满）或数据损坏过，
+     必须在页面上明说，不能让用户以为已经保存好了。 */
+
+  function storageIssues() {
+    var d = S.diagnostics();
+    var issues = [];
+    if (!d.available) {
+      issues.push({ level: 'danger', text: '本机浏览器不允许保存数据（常见于无痕/隐私模式，或系统限制了存储）：现在记的内容刷新后就会消失。请立刻到「设置 → 数据安全」导出 JSON 备份。' });
+    } else if (d.pending) {
+      issues.push({ level: 'danger', text: '刚才这条记录没有真正写进本机存储，刷新后会消失。请到「设置 → 数据安全」导出备份，并确认没有使用无痕窗口。' });
+    }
+    if (d.lastError && d.lastError.type === 'corrupt') {
+      issues.push({ level: 'danger', text: '本机记录损坏且无法自动修复。原始内容已留副本，请到「设置 → 数据安全」导出后联系开发者。' });
+    } else if (d.lastError && d.lastError.type === 'repair') {
+      issues.push({ level: 'warn', text: '本机记录曾损坏，已自动修复：' + d.lastError.message });
+    }
+    return issues;
+  }
+
+  function renderStorageBanner() {
+    var main = $('#main') || document.body;
+    var host = $('#storageBanner');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'storageBanner';
+      main.insertBefore(host, main.firstChild);
+    }
+    var issues = storageIssues();
+    if (!issues.length) { host.className = ''; host.innerHTML = ''; return; }
+    var worst = issues.some(function (i) { return i.level === 'danger'; }) ? 'danger' : 'warn';
+    host.className = 'banner banner-' + worst;
+    host.innerHTML = issues.map(function (i) {
+      return '<div class="banner-line">' + (i.level === 'danger' ? '⚠️' : 'ℹ️') + ' ' + escapeHtml(i.text) + '</div>';
+    }).join('') + '<div class="banner-actions"><a class="btn" href="settings.html#safe">去导出备份</a></div>';
+  }
+
+  if (global.addEventListener) global.addEventListener('fatloss:change', renderStorageBanner);
+
   global.FatLossApp = {
     $: $, $$: $$, escapeHtml: escapeHtml, fmtNum: fmtNum,
     dateLabel: dateLabel, shortDate: shortDate, relativeDay: relativeDay,
@@ -241,6 +282,7 @@
     applyTheme: applyTheme, renderNav: renderNav,
     loadFoods: loadFoods, calcNutrients: calcNutrients,
     pct: pct, progressHtml: progressHtml, flash: flash,
+    storageIssues: storageIssues, renderStorageBanner: renderStorageBanner,
     MEAL_ORDER: S.MEALS
   };
 })(typeof window !== 'undefined' ? window : globalThis);
