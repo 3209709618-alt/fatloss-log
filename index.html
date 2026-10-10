@@ -83,7 +83,7 @@
       <span class="small muted" id="weightDelta"></span>
     </div>
     <div class="row">
-      <input type="number" id="weightInput" step="0.1" min="20" max="400" placeholder="例如 72.4" inputmode="decimal">
+      <input type="number" id="weightInput" step="0.01" min="20" max="400" placeholder="例如 72.45" inputmode="decimal">
       <button class="btn btn-primary" id="weightSave">保存</button>
     </div>
     <p class="small muted mt8">同一天重复保存会覆盖；建议固定时间（如晨起空腹）称重。</p>
@@ -124,7 +124,7 @@
     document.getElementById('statKcal').innerHTML = A.fmtNum(s.kcal) + '<small>kcal</small>';
     document.getElementById('statProtein').innerHTML = A.fmtNum(s.protein, 1) + '<small>g</small>';
     document.getElementById('statWeight').innerHTML =
-      (s.weight === null ? '—' : A.fmtNum(s.weight, 1)) + '<small>kg</small>';
+      (s.weight === null ? '—' : A.fmtNum(s.weight, 2)) + '<small>kg</small>';
     document.getElementById('statCarbs').innerHTML = A.fmtNum(s.carbs, 1) + '<small>g</small>';
     document.getElementById('statFat').innerHTML = A.fmtNum(s.fat, 1) + '<small>g</small>';
     document.getElementById('statMeals').innerHTML = s.meals.length + '<small>条</small>';
@@ -214,7 +214,7 @@
     var all = S.loadRecords().weights.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; });
     var prev = all.filter(function (w) { return w.date < today; })[0];
     document.getElementById('weightDelta').textContent = (s.weight !== null && prev)
-      ? '较 ' + prev.date + ' ' + (s.weight - prev.weight >= 0 ? '+' : '') + A.fmtNum(s.weight - prev.weight, 1) + ' kg'
+      ? '较 ' + prev.date + ' ' + (s.weight - prev.weight >= 0 ? '+' : '') + A.fmtNum(s.weight - prev.weight, 2) + ' kg'
       : '';
   }
 
