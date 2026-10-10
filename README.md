@@ -93,13 +93,14 @@ node tools/smoke-test.js
   "version": 1,
   "exercises": [{ "id": "…", "date": "2026-10-09", "type": "力量", "durationMin": 45, "intensity": "中", "calories": 300, "note": "", "createdAt": "…", "updatedAt": "…" }],
   "meals": [{ "id": "…", "date": "2026-10-09", "meal": "午餐", "name": "鸡胸肉(生)", "amount": 150, "unit": "g", "kcal": 180, "protein": 34.5, "carbs": 1.5, "fat": 3.8, "note": "", "createdAt": "…", "updatedAt": "…" }],
-  "weights": [{ "id": "…", "date": "2026-10-09", "weight": 72.4, "createdAt": "…" }],
+  "weights": [{ "id": "…", "date": "2026-10-09", "weight": 72.45, "createdAt": "…" }],
   "customFoods": [{ "name": "自制鸡胸沙拉", "unit": "份", "kcal": 320, "protein": 35, "carbs": 12, "fat": 14 }]
 }
 ```
 
 导入时会经过 `migrateRecords()` 收敛：缺字段补默认、日期非法或时长为 0 的记录直接丢弃，因此手改过的旧数据也不会把页面弄崩。
 体重折线对「没有记录的日子」沿用上一个已知体重，只为让曲线连续——图表上的点仍是真实记录值。
+体重保留**两位小数**：输入 72.456 存为 72.46，输入 72.4 存为 72.4；各页显示时会去掉多余的 0（72.40 显示成 72.4），导出的 CSV 也是同样的数值。
 
 ## 隐私
 
