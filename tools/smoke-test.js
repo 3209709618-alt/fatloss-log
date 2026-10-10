@@ -76,6 +76,19 @@ test('同一天体重重复保存为覆盖而不是新增', () => {
   assert.strictEqual(w[0].weight, 72.1);
 });
 
+test('体重保留两位小数（多余位数四舍五入，整数值不补零）', () => {
+  S.clearAll();
+  S.upsertWeight('2026-10-09', 72.456);
+  assert.strictEqual(S.loadRecords().weights[0].weight, 72.46);
+  S.upsertWeight('2026-10-09', 72.444);
+  assert.strictEqual(S.loadRecords().weights[0].weight, 72.44);
+  S.upsertWeight('2026-10-09', 72.4);
+  assert.strictEqual(S.loadRecords().weights[0].weight, 72.4);
+  S.upsertWeight('2026-10-09', 73);
+  assert.strictEqual(S.loadRecords().weights[0].weight, 73);
+  assert.strictEqual(S.weightsCSV().includes('72.46') || S.weightsCSV().includes('73'), true, 'CSV 里是原始数值');
+});
+
 test('更新与删除记录', () => {
   const e = S.addExercise({ date: '2026-10-07', type: '有氧', durationMin: 30 });
   assert.strictEqual(S.updateExercise(e.id, { durationMin: 50 }).durationMin, 50);
@@ -103,7 +116,7 @@ test('脏数据迁移：丢弃坏记录、补齐缺字段', () => {
   assert.strictEqual(clean.exercises[0].durationMin, 30);
   assert.strictEqual(clean.exercises[0].type, '其他');
   assert.strictEqual(clean.meals[0].meal, '加餐');
-  assert.strictEqual(clean.weights[0].weight, 70.6);
+  assert.strictEqual(clean.weights[0].weight, 70.55, '体重保留两位小数');
   assert.strictEqual(clean.version, S.SCHEMA_VERSION);
 });
 
