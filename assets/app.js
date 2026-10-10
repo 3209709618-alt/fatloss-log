@@ -236,6 +236,35 @@
 
   function flash(msg) { toast(msg, 'ok'); }
 
+  function daysSince(iso) {
+    var t = new Date(iso).getTime();
+    if (isNaN(t)) return null;
+    return Math.max(0, Math.round((Date.now() - t) / 86400000));
+  }
+
+  /** 复制文本：优先 Clipboard API；失败时退回 textarea + execCommand（老版本 iOS Safari 用得上） */
+  function copyText(text) {
+    function legacy() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', 'readonly');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) { return false; }
+    }
+    if (global.navigator && global.navigator.clipboard && global.navigator.clipboard.writeText) {
+      return global.navigator.clipboard.writeText(text).then(function () { return true; }, function () { return legacy(); });
+    }
+    return Promise.resolve(legacy());
+  }
+
   /* ---------------- 数据安全横幅 ----------------
      一旦本机存储写不进去（无痕模式、被系统限制、空间满）或数据损坏过，
      必须在页面上明说，不能让用户以为已经保存好了。 */
@@ -253,7 +282,43 @@
     } else if (d.lastError && d.lastError.type === 'repair') {
       issues.push({ level: 'warn', text: '本机记录曾损坏，已自动修复：' + d.lastError.message });
     }
+
+    // 备份提醒：数据只在这台设备的这个浏览器里，没备份过（或超过 7 天）就提醒一次
+    var total = d.counts.exercises + d.counts.meals + d.counts.weights;
+    var snoozed = d.backupSnoozeUntil && new Date(d.backupSnoozeUntil).getTime() > Date.now();
+    if (d.available && !d.pending && total > 0 && !snoozed) {
+      var ago = d.lastExportAt ? daysSince(d.lastExportAt) : null;
+      if (ago === null || ago >= 7) {
+        issues.push({
+          level: 'warn',
+          backup: true,
+          text: (ago === null ? '这些记录只存在这台设备的这个浏览器里，还没有备份过。' : '上次备份是 ' + ago + ' 天前。') +
+            'iPhone 上换成「主屏幕图标」打开、用过无痕模式、或清除过网站数据，都会看不到原记录。建议现在复制或导出一份备份。'
+        });
+      }
+    }
     return issues;
+  }
+
+  function onBannerClick(e) {
+    var btn = e.target.closest ? e.target.closest('[data-banner]') : null;
+    if (!btn) return;
+    var act = btn.getAttribute('data-banner');
+    if (act === 'copy') {
+      copyText(S.exportJSON()).then(function (ok) {
+        if (ok) {
+          S.markExported();
+          toast('备份已复制：粘贴到「备忘录」或存进「文件」App 就有一份了', 'ok');
+        } else {
+          toast('复制失败：请到「设置 → 数据安全」下载 JSON 文件', 'error');
+        }
+        renderStorageBanner();
+      });
+    } else if (act === 'snooze') {
+      S.snoozeBackup(7);
+      toast('好的，7 天后再提醒');
+      renderStorageBanner();
+    }
   }
 
   function renderStorageBanner() {
@@ -267,10 +332,19 @@
     var issues = storageIssues();
     if (!issues.length) { host.className = ''; host.innerHTML = ''; return; }
     var worst = issues.some(function (i) { return i.level === 'danger'; }) ? 'danger' : 'warn';
+    var hasBackup = issues.some(function (i) { return i.backup; });
     host.className = 'banner banner-' + worst;
     host.innerHTML = issues.map(function (i) {
       return '<div class="banner-line">' + (i.level === 'danger' ? '⚠️' : 'ℹ️') + ' ' + escapeHtml(i.text) + '</div>';
-    }).join('') + '<div class="banner-actions"><a class="btn" href="settings.html#safe">去导出备份</a></div>';
+    }).join('') + '<div class="banner-actions">' +
+      (hasBackup ? '<button class="btn btn-primary" type="button" data-banner="copy">复制备份</button>' : '') +
+      '<a class="btn" href="settings.html#safe">' + (hasBackup ? '导出 JSON' : '去导出备份') + '</a>' +
+      (hasBackup ? '<button class="btn" type="button" data-banner="snooze">7 天后再提醒</button>' : '') +
+      '</div>';
+    if (!host.__wired) {
+      host.__wired = true;
+      host.addEventListener('click', onBannerClick);
+    }
   }
 
   if (global.addEventListener) global.addEventListener('fatloss:change', renderStorageBanner);
@@ -282,6 +356,7 @@
     applyTheme: applyTheme, renderNav: renderNav,
     loadFoods: loadFoods, calcNutrients: calcNutrients,
     pct: pct, progressHtml: progressHtml, flash: flash,
+    copyText: copyText, daysSince: daysSince,
     storageIssues: storageIssues, renderStorageBanner: renderStorageBanner,
     MEAL_ORDER: S.MEALS
   };
