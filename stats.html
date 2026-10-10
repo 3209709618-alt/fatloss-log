@@ -132,7 +132,7 @@
     render();
   });
 
-  function signed(v) { return (v > 0 ? '+' : '') + A.fmtNum(v, 1); }
+  function signed(v) { return (v > 0 ? '+' : '') + A.fmtNum(v, 2); }
 
   function render() {
     var today = S.today();
@@ -161,7 +161,7 @@
       '<span style="color:' + (wDelta <= 0 ? 'var(--brand)' : 'var(--warn)') + '">' + signed(wDelta) + '<small>kg</small></span>';
 
     document.getElementById('weightMeta').textContent = knownW.length
-      ? '最新 ' + A.fmtNum(knownW[knownW.length - 1], 1) + ' kg · 区间内记录 ' +
+      ? '最新 ' + A.fmtNum(knownW[knownW.length - 1], 2) + ' kg · 区间内记录 ' +
         S.loadRecords().weights.filter(function (w) { return w.date >= dates[0] && w.date <= today; }).length + ' 次'
       : '还没有体重记录';
 
@@ -169,7 +169,7 @@
       labels: dates.map(A.shortDate),
       series: [{ name: '体重', data: weights, color: P.weight, fill: true }],
       unit: 'kg',
-      fmt: function (v) { return A.fmtNum(v, 1); },
+      fmt: function (v) { return A.fmtNum(v, 2); },
       emptyText: '还没有体重记录，去「记录」页填一次',
       height: 210
     });
@@ -238,7 +238,7 @@
       return '<tr><td>' + s.date + '</td><td>' + A.fmtNum(s.minutes) + '</td><td>' + s.exerciseCount +
         '</td><td>' + A.fmtNum(s.kcal) + '</td><td>' + A.fmtNum(s.protein, 1) + '</td><td>' +
         A.fmtNum(s.carbs, 1) + '</td><td>' + A.fmtNum(s.fat, 1) + '</td><td>' +
-        (s.weight === null ? '—' : A.fmtNum(s.weight, 1)) + '</td></tr>';
+        (s.weight === null ? '—' : A.fmtNum(s.weight, 2)) + '</td></tr>';
     }).join('') : '<tr><td colspan="8" class="empty">这段时间还没有任何记录</td></tr>';
   }
 
