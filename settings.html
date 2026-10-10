@@ -105,11 +105,24 @@
     </div>
     <div id="safeStatus"></div>
     <div class="grid grid-4 mt12" id="safeStats"></div>
+    <p class="small muted mt8" id="safeEnv"></p>
 
     <div class="row mt12">
       <button class="btn btn-primary" id="safeBackup" type="button">立即备份（下载 JSON）</button>
+      <button class="btn" id="safeCopy" type="button">复制备份</button>
     </div>
     <p class="small muted mt8" id="safeBackupHint"></p>
+
+    <details class="mt12">
+      <summary class="li-title">iPhone / iPad 上数据为什么会「消失」？</summary>
+      <ul class="list mt8">
+        <li><div class="li-main"><div class="li-title">无痕（隐私）浏览</div><div class="li-sub">关掉窗口就清空，什么都不留 —— 别在无痕窗口里记账。</div></div></li>
+        <li><div class="li-main"><div class="li-title">「主屏幕图标」和 Safari 标签页是两套存储</div><div class="li-sub">在哪个入口记的，就只能回哪个入口看，互不相通。固定用一个入口。</div></div></li>
+        <li><div class="li-main"><div class="li-title">清除历史记录与网站数据 / 阻止所有 Cookie</div><div class="li-sub">前者清空本机记录；后者让保存直接失败（页面顶部会出红条提醒）。</div></div></li>
+        <li><div class="li-main"><div class="li-title">系统回收与换容器</div><div class="li-sub">iOS 可能回收长期没打开的网站的脚本存储；换浏览器、换手机、用微信等 App 的内置浏览器打开，也都是不同的存储空间。</div></div></li>
+        <li><div class="li-main"><div class="li-title">正确的用法</div><div class="li-sub">固定一个入口 + 每周点一次「复制备份」或「立即备份」，把 JSON 存进备忘录 / 文件 App（iCloud 会同步）。换设备时用下面的「导入」恢复。</div></div></li>
+      </ul>
+    </details>
 
     <div class="mt12">
       <div class="li-title">历史快照（误删、误导入可以退回）</div>
@@ -218,6 +231,14 @@
       '<div class="stat"><div class="k">持久化存储</div><div class="v v-sm">' + persistText + '</div></div>' +
       '<div class="stat"><div class="k">快照</div><div class="v">' + d.snapshots.length + '<small>份</small></div></div>';
 
+    var total = d.counts.exercises + d.counts.meals + d.counts.weights;
+    var where = d.standalone ? '已添加到主屏幕的独立窗口（与 Safari 标签页是两套独立存储）' : (d.ios ? 'Safari 标签页' : '普通浏览器标签页');
+    document.getElementById('safeEnv').textContent =
+      '当前打开方式：' + where + ' · 记录 ' + total + ' 条 · 数据存在 ' + (d.origin || '本机浏览器') +
+      (d.standalone
+        ? '。如果之前在 Safari 标签页里记过东西，去那个入口还能看到，但两个入口互不相通。'
+        : (d.ios ? '。如果把它「添加到主屏幕」，那是另一个入口、另一套数据。' : ''));
+
     var ago = d.lastExportAt ? daysAgo(d.lastExportAt) : null;
     document.getElementById('safeBackupHint').textContent = d.lastExportAt
       ? ('上次备份：' + fmtTime(d.lastExportAt) + '（' + ago + ' 天前）。建议每周导出一次，换手机、换浏览器时也能恢复。')
@@ -245,6 +266,15 @@
     S.markExported();
     renderSafe();
     A.flash('已导出 JSON 备份');
+  });
+
+  document.getElementById('safeCopy').addEventListener('click', function () {
+    A.copyText(S.exportJSON()).then(function (ok) {
+      if (!ok) { A.toast('复制失败：请用「立即备份」下载 JSON 文件', 'error'); return; }
+      S.markExported();
+      renderSafe();
+      A.flash('已复制：粘贴到「备忘录」或存进「文件」App 就有一份备份了');
+    });
   });
 
   document.getElementById('snapList').addEventListener('click', function (e) {
