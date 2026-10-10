@@ -182,9 +182,9 @@
     var parts = ['本月运动 ' + A.fmtNum(minutes) + ' 分钟'];
     if (mealDays) parts.push('日均摄入 ' + A.fmtNum(kcal / mealDays) + ' kcal');
     if (ws.length > 1) {
-      parts.push('体重 ' + A.fmtNum(ws[0].v, 1) + '→' + A.fmtNum(ws[ws.length - 1].v, 1) + ' kg');
+      parts.push('体重 ' + A.fmtNum(ws[0].v, 2) + '→' + A.fmtNum(ws[ws.length - 1].v, 2) + ' kg');
     } else if (ws.length === 1) {
-      parts.push('体重 ' + A.fmtNum(ws[0].v, 1) + ' kg');
+      parts.push('体重 ' + A.fmtNum(ws[0].v, 2) + ' kg');
     }
     document.getElementById('monthSummary').textContent = parts.join(' · ');
   }
@@ -199,7 +199,7 @@
     document.getElementById('dMinutes').innerHTML = A.fmtNum(s.minutes) + '<small>分钟</small>';
     document.getElementById('dKcal').innerHTML = A.fmtNum(s.kcal) + '<small>kcal</small>';
     document.getElementById('dProtein').innerHTML = A.fmtNum(s.protein, 1) + '<small>g</small>';
-    document.getElementById('dWeight').innerHTML = (s.weight === null ? '—' : A.fmtNum(s.weight, 1)) + '<small>kg</small>';
+    document.getElementById('dWeight').innerHTML = (s.weight === null ? '—' : A.fmtNum(s.weight, 2)) + '<small>kg</small>';
 
     document.getElementById('dExMeta').textContent = s.exercises.length ? s.exercises.length + ' 条记录' : '';
     document.getElementById('exList').innerHTML = s.exercises.length ? s.exercises.map(function (e) {
