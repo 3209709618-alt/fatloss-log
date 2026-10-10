@@ -185,7 +185,7 @@
       <span class="small muted" id="weightHint"></span>
     </div>
     <div class="row">
-      <input type="number" id="weightInput" step="0.1" min="20" max="400" inputmode="decimal" placeholder="当天体重 kg">
+      <input type="number" id="weightInput" step="0.01" min="20" max="400" inputmode="decimal" placeholder="当天体重 kg">
       <button class="btn btn-primary" id="weightSave">保存</button>
       <button class="btn btn-ghost hidden" id="weightDelete">删除当天</button>
     </div>
@@ -562,7 +562,7 @@
     document.getElementById('sumChip').textContent = state.date;
     document.getElementById('daySummary').textContent =
       '运动 ' + A.fmtNum(s.minutes) + ' 分钟 · 摄入 ' + A.fmtNum(s.kcal) + ' kcal · 体重 ' +
-      (s.weight === null ? '—' : A.fmtNum(s.weight, 1) + ' kg');
+      (s.weight === null ? '—' : A.fmtNum(s.weight, 2) + ' kg');
     document.getElementById('mealSum').textContent =
       '合计 ' + A.fmtNum(s.kcal) + ' kcal｜蛋白 ' + A.fmtNum(s.protein, 1) +
       'g｜碳水 ' + A.fmtNum(s.carbs, 1) + 'g｜脂肪 ' + A.fmtNum(s.fat, 1) + 'g';
@@ -611,7 +611,7 @@
     var wInput = document.getElementById('weightInput');
     if (document.activeElement !== wInput) wInput.value = s.weight === null ? '' : s.weight;
     document.getElementById('weightDelete').classList.toggle('hidden', s.weight === null);
-    document.getElementById('weightHint').textContent = s.weight === null ? '当天未记录' : '已记录 ' + A.fmtNum(s.weight, 1) + ' kg';
+    document.getElementById('weightHint').textContent = s.weight === null ? '当天未记录' : '已记录 ' + A.fmtNum(s.weight, 2) + ' kg';
   }
 
   /* ---------- 列表事件委托 ---------- */
