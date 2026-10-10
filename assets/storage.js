@@ -187,7 +187,7 @@
     return {
       id: w.id || uid(),
       date: w.date,
-      weight: Math.round(kg * 10) / 10,
+      weight: Math.round(kg * 100) / 100,
       createdAt: w.createdAt || new Date().toISOString()
     };
   }
