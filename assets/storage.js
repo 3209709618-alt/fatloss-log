@@ -26,6 +26,7 @@
   var CORRUPT_KEY = 'fatloss.corrupt.v1';
   var LOG_KEY = 'fatloss.log.v1';
   var EXPORT_KEY = 'fatloss.lastexport.v1';
+  var SNOOZE_KEY = 'fatloss.backupsnooze.v1';
   var SNAPSHOT_MAX = 6;
   var LOG_MAX = 20;
 
@@ -428,6 +429,9 @@
       writeFails: state.writeFails,
       persisting: state.persisting,
       lastExportAt: lastExport,
+      backupSnoozeUntil: (function () { try { return global.localStorage.getItem(SNOOZE_KEY); } catch (e) { return null; } })(),
+      standalone: !!(global.matchMedia && global.matchMedia('(display-mode: standalone)').matches) || (global.navigator && global.navigator.standalone === true),
+      ios: /iPad|iPhone|iPod/.test((global.navigator && global.navigator.userAgent) || ''),
       counts: {
         exercises: rec.exercises.length,
         meals: rec.meals.length,
@@ -452,6 +456,13 @@
     try { global.localStorage.setItem(EXPORT_KEY, at); } catch (e) { /* 忽略 */ }
     logEvent('export', '导出了 JSON 备份');
     return at;
+  }
+
+  /** 「7 天后再提醒」：到期前不再弹备份提醒 */
+  function snoozeBackup(days) {
+    var until = new Date(Date.now() + (days || 7) * 86400000).toISOString();
+    try { global.localStorage.setItem(SNOOZE_KEY, until); } catch (e) { /* 忽略 */ }
+    return until;
   }
 
   /* ---------------- 增删改 ---------------- */
@@ -829,6 +840,7 @@
     listSnapshots: listSnapshots,
     restoreSnapshot: restoreSnapshot,
     quarantineText: quarantineText,
-    markExported: markExported
+    markExported: markExported,
+    snoozeBackup: snoozeBackup
   };
 })(typeof window !== 'undefined' ? window : globalThis);
