@@ -263,4 +263,21 @@ test('自检信息结构完整（origin/容量/条数/日志）', () => {
   assert.strictEqual(typeof d.pending, 'boolean');
 });
 
+test('备份提醒：标记导出与「7 天后再提醒」都能被自检读到', () => {
+  S.clearAll();
+  S.addExercise({ date: '2026-10-09', type: '力量', durationMin: 15 });
+  const d1 = S.diagnostics();
+  assert.strictEqual(d1.backupSnoozeUntil, null, '默认没有延后提醒');
+  assert.strictEqual(typeof d1.standalone, 'boolean', '应报是否「添加到主屏幕」的独立窗口');
+  assert.strictEqual(typeof d1.ios, 'boolean', '应报是否 iOS');
+
+  S.markExported();
+  assert.ok(S.diagnostics().lastExportAt, '标记导出后应能看到备份时间');
+
+  const until = S.snoozeBackup(7);
+  const days = Math.round((new Date(until) - Date.now()) / 86400000);
+  assert.strictEqual(days, 7, '应写 7 天后的时间，实际 ' + days);
+  assert.strictEqual(S.diagnostics().backupSnoozeUntil, until, '自检应能读到延后提醒时间');
+});
+
 console.log('\n通过 ' + passed + ' 项' + (process.exitCode ? '（有失败）' : '，全部通过'));
